@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings — UKH</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="settings">
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">UKH</div>
+          <div class="brand-copy">
+            <span class="brand-name">UKH</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Main navigation">
+          <a href="index.html" class="nav-item">
+            <span class="nav-icon">⌕</span>
+            <span>New Search</span>
+          </a>
+          <a href="history.html" class="nav-item">
+            <span class="nav-icon">⏱</span>
+            <span>Search History</span>
+          </a>
+          <a href="sources.html" class="nav-item">
+            <span class="nav-icon">◌</span>
+            <span>Sources</span>
+          </a>
+          <a href="settings.html" class="nav-item active">
+            <span class="nav-icon">⚙</span>
+            <span>Settings</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-section">
+          <div class="section-label">Knowledge</div>
+          <div class="nav-submenu">
+            <button class="menu-link" type="button">All Sources</button>
+            <button class="menu-link" type="button">Local Files</button>
+            <button class="menu-link" type="button">Google Drive</button>
+            <button class="menu-link" type="button">Gmail</button>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="profile-pill">
+            <div class="avatar">AM</div>
+            <div>
+              <strong>Alex Morgan</strong>
+              <small>Workspace</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="mobile-header">
+        <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation">☰</button>
+        <div class="brand-mini">UKH</div>
+        <button class="icon-button" id="mobileThemeToggle" type="button" aria-label="Toggle color theme">☼</button>
+      </div>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="search-lens" aria-hidden="true">⌕</div>
+          <div class="topbar-meta">
+            <span class="eyebrow">Settings</span>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="themeToggle" type="button" aria-label="Toggle color theme">☼</button>
+            <button class="compact-button" type="button" id="commandPaletteTrigger">⌘K</button>
+          </div>
+        </header>
+
+        <div class="page-frame">
+          <section class="page-panel">
+            <div class="page-header-row">
+              <div>
+                <p class="eyebrow muted">Account</p>
+                <h1>Settings</h1>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <div class="settings-card">
+                <h2>Account</h2>
+                <ul>
+                  <li>Profile</li>
+                  <li>Workspace</li>
+                  <li>Notifications</li>
+                </ul>
+              </div>
+              <div class="settings-card">
+                <h2>Connected sources</h2>
+                <ul>
+                  <li>Google Drive connected</li>
+                  <li>Local Files connected</li>
+                  <li>Gmail disconnected</li>
+                </ul>
+              </div>
+              <div class="settings-card">
+                <h2>Privacy</h2>
+                <p>
+                  UKH stores searchable metadata and semantic representations according to your configured privacy policy.
+                </p>
+              </div>
+              <div class="settings-card">
+                <h2>Appearance</h2>
+                <ul>
+                  <li>Light mode</li>
+                  <li>Dark mode</li>
+                  <li>Compact density</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div id="commandPalette" class="command-palette hidden" aria-hidden="true">
+      <div class="command-backdrop" data-close-command-palette="true"></div>
+      <div class="command-dialog" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="command-header">
+          <span class="search-glass">⌕</span>
+          <input id="commandInput" type="text" placeholder="Type a command or search" aria-label="Command palette" />
+        </div>
+        <div class="command-list">
+          <button class="command-item" type="button" data-command="new-search">New search</button>
+          <button class="command-item" type="button" data-command="history">Search history</button>
+          <button class="command-item" type="button" data-command="sources">Connect source</button>
+          <button class="command-item" type="button" data-command="settings">Open settings</button>
+          <button class="command-item" type="button" data-command="theme">Toggle dark mode</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/mock-data.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
