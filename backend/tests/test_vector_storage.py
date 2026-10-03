@@ -1,36 +1,27 @@
 import unittest
 
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base
+from app.enrichment.embeddings import MockEmbeddingService
 from app.models import KnowledgeItem, KnowledgeItemEmbedding
 from app.schemas import KnowledgeItemCreate
-from app.services.embeddings import MockEmbeddingService
-from app.services.knowledge_items import create_knowledge_item
-from app.services.vector_storage import (
-	search_similar_knowledge_items,
-	store_embedding,
-)
+from app.ingestion.catalog import create_knowledge_item
+from app.ingestion.indexing import store_embedding
+from app.retrieval.semantic import search_similar_knowledge_items
+
+from _postgres_test_db import create_postgres_test_engine
 
 
 class VectorStorageTests(unittest.TestCase):
 	def setUp(self):
-		self.engine = create_engine(
-			"sqlite://",
-			connect_args={"check_same_thread": False},
-			poolclass=StaticPool,
-		)
-		Base.metadata.create_all(self.engine)
+		self.engine, self.cleanup_database = create_postgres_test_engine()
 		self.session_factory = sessionmaker(bind=self.engine)
 		self.db = self.session_factory()
 		self.embedding_service = MockEmbeddingService(dimensions=16)
 
 	def tearDown(self):
 		self.db.close()
-		Base.metadata.drop_all(self.engine)
-		self.engine.dispose()
+		self.cleanup_database()
 
 	def create_item(self, source_item_id: str) -> KnowledgeItem:
 		return create_knowledge_item(

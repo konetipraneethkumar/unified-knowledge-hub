@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import SecretStr
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -14,7 +19,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:8000,http://localhost:4173,http://127.0.0.1:4173"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BACKEND_ROOT / ".env",
         extra="ignore",
     )
 

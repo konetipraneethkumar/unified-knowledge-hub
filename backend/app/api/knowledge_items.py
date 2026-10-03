@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import User
 from app.schemas import KnowledgeItemCreate, KnowledgeItemRead
-from app.services.knowledge_items import (
+from app.ingestion.catalog import (
 	create_knowledge_item,
 	get_knowledge_item,
 	list_knowledge_items,

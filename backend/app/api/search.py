@@ -5,12 +5,12 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models import User
 from app.retrieval.hybrid import hybrid_search
+from app.retrieval.lexical import search_knowledge_items
 from app.schemas import (
 	HybridKnowledgeItemSearchResponse,
 	KnowledgeItemSearchResponse,
 )
-from app.services.embeddings import EmbeddingService, get_embedding_service
-from app.services.knowledge_items import search_knowledge_items
+from app.enrichment.embeddings import EmbeddingService, get_embedding_service
 
 
 router = APIRouter(tags=["search"])

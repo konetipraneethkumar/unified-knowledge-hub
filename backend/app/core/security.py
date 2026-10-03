@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import AuthToken, Device, User
+from app.models import AuthToken, User
 
 password_hasher = PasswordHasher()
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -39,10 +39,3 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     return user
-
-
-def get_active_device(device_id: str, credential: str, db: Session) -> Device:
-    device = db.get(Device, device_id)
-    if device is None or device.credential_hash != hash_secret(credential) or device.revoked_at is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked device credential")
-    return device

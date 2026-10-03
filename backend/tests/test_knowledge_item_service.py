@@ -1,33 +1,25 @@
 import unittest
 
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base
 from app.schemas import KnowledgeItemCreate
-from app.services.knowledge_items import (
+from app.ingestion.catalog import (
 	create_knowledge_item,
 	get_knowledge_item,
 	list_knowledge_items,
 )
+from _postgres_test_db import create_postgres_test_engine
 
 
 class KnowledgeItemServiceTests(unittest.TestCase):
 	def setUp(self):
-		self.engine = create_engine(
-			"sqlite://",
-			connect_args={"check_same_thread": False},
-			poolclass=StaticPool,
-		)
-		Base.metadata.create_all(self.engine)
+		self.engine, self.cleanup_database = create_postgres_test_engine()
 		self.session_factory = sessionmaker(bind=self.engine)
 		self.db = self.session_factory()
 
 	def tearDown(self):
 		self.db.close()
-		Base.metadata.drop_all(self.engine)
-		self.engine.dispose()
+		self.cleanup_database()
 
 	def test_create_persists_and_returns_knowledge_item(self):
 		payload = KnowledgeItemCreate(

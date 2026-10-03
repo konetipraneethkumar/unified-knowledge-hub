@@ -1,6 +1,6 @@
 import unittest
 
-from app.utils.privacy_filter import (
+from app.ingestion.privacy import (
 	ALLOWED_FILE_METADATA_FIELDS,
 	filter_file_content,
 	filter_file_metadata,

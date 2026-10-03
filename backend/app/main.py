@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.agent import router as agent_router
 from app.api.auth import router as auth_router
 from app.api.connectors import router as connectors_router
 from app.api.devices import router as devices_router
@@ -22,9 +21,6 @@ app.include_router(devices_router)
 app.include_router(connectors_router)
 app.include_router(knowledge_items_router)
 app.include_router(search_router)
-app.include_router(agent_router)
-
-
 @app.get("/health")
 def health_check() -> dict[str, str]:
 	return {"status": "ok"}

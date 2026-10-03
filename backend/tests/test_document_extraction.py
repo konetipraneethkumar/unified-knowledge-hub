@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.services.document_extraction import extract_document_text
+from app.ingestion.extraction import extract_document_text
 
 
 class DocumentExtractionTests(unittest.TestCase):
@@ -78,9 +78,9 @@ class DocumentExtractionTests(unittest.TestCase):
 
 	def test_extracts_legacy_doc_through_antiword(self):
 		with (
-			patch("app.services.document_extraction.shutil.which", return_value="antiword"),
+			patch("app.ingestion.extraction.shutil.which", return_value="antiword"),
 			patch(
-				"app.services.document_extraction.subprocess.run",
+				"app.ingestion.extraction.subprocess.run",
 				return_value=SimpleNamespace(stdout="doc marker"),
 			) as run,
 		):
@@ -88,7 +88,7 @@ class DocumentExtractionTests(unittest.TestCase):
 			run.assert_called_once()
 
 	def test_legacy_doc_reports_missing_antiword(self):
-		with patch("app.services.document_extraction.shutil.which", return_value=None):
+		with patch("app.ingestion.extraction.shutil.which", return_value=None):
 			with self.assertRaisesRegex(RuntimeError, "antiword"):
 				extract_document_text("document.doc")
 

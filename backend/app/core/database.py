@@ -10,16 +10,10 @@ class Base(DeclarativeBase):
 
 
 database_url = make_url(settings.DATABASE_URL)
-connect_args = (
-    {"check_same_thread": False}
-    if database_url.get_backend_name() == "sqlite"
-    else {}
-)
+if database_url.get_backend_name() != "postgresql":
+    raise ValueError("DATABASE_URL must use PostgreSQL")
 
-engine = create_engine(
-    database_url,
-    connect_args=connect_args,
-)
+engine = create_engine(database_url)
 
 
 SessionLocal = sessionmaker(
