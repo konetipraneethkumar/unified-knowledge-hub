@@ -44,6 +44,8 @@ class KnowledgeItemSchemaTests(unittest.TestCase):
             modified_at=None,
             indexed_at=timestamp,
             content_hash="internal-hash",
+            processing_status="processed",
+            processing_error=None,
         )
 
         result = KnowledgeItemRead.model_validate(item)
@@ -51,6 +53,7 @@ class KnowledgeItemSchemaTests(unittest.TestCase):
         self.assertEqual(result.id, 1)
         self.assertEqual(result.source_item_id, "item-1")
         self.assertEqual(result.created_at, timestamp)
+        self.assertEqual(result.processing_status, "processed")
         self.assertNotIn("content_hash", result.model_dump())
 
 

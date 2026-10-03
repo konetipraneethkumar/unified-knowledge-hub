@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: smriti-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: smriti_ai
+      POSTGRES_USER: smriti_user
+      POSTGRES_PASSWORD: smriti_dev_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - smriti_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  smriti_postgres_data:

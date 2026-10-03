@@ -10,3 +10,8 @@ pgvector
 pydantic
 pydantic-settings
 python-dotenv
+pypdf
+python-docx
+python-pptx
+openpyxl
+argon2-cffi
