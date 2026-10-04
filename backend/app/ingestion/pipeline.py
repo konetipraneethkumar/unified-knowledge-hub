@@ -20,7 +20,24 @@ def process_file_content(
 	chunk_size: int = 1200,
 	chunk_overlap: int = 150,
 ) -> ProcessedContent:
-	content = filter_file_content(extract_document_text(path))
+	return process_text_content(
+		extract_document_text(path),
+		embedding_service,
+		chunk_size=chunk_size,
+		chunk_overlap=chunk_overlap,
+	)
+
+
+def process_text_content(
+	content: str,
+	embedding_service: EmbeddingService,
+	*,
+	chunk_size: int = 1200,
+	chunk_overlap: int = 150,
+) -> ProcessedContent:
+	if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
+		raise ValueError("chunk_overlap must be nonnegative and smaller than chunk_size")
+	content = filter_file_content(content)
 	chunks = chunk_text(content, chunk_size, chunk_overlap)
 	if not chunks:
 		return ProcessedContent(content=content, embedding=None)

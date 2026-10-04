@@ -87,6 +87,29 @@ class LocalFilesystemScannerTests(unittest.TestCase):
 
 		self.assertEqual([record.filename for record in records], ["accessible.txt"])
 
+	def test_reports_inaccessible_file_metadata_when_requested(self):
+		with tempfile.TemporaryDirectory() as temporary_directory:
+			root = Path(temporary_directory)
+			inaccessible_file = root / "inaccessible.txt"
+			inaccessible_file.write_text("skip", encoding="utf-8")
+			real_stat = os.stat
+			errors = []
+
+			def stat_with_inaccessible_file(path, *args, **kwargs):
+				if Path(path) == inaccessible_file:
+					raise PermissionError("access denied")
+				return real_stat(path, *args, **kwargs)
+
+			with patch(
+				"app.connectors.local_filesystem.os.stat",
+				side_effect=stat_with_inaccessible_file,
+			):
+				records = scan_directory(root, errors=errors)
+
+		self.assertEqual(records, [])
+		self.assertEqual(len(errors), 1)
+		self.assertIsInstance(errors[0], PermissionError)
+
 
 if __name__ == "__main__":
 	unittest.main()

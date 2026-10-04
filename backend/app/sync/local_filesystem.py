@@ -21,6 +21,10 @@ def index_local_directory(
 	embedding_service: EmbeddingService | None = None,
 	chunk_size: int = 1200,
 	chunk_overlap: int = 150,
+	*,
+	owner_id: int | None = None,
+	connector_id: str | None = None,
+	device_id: str | None = None,
 ) -> list[KnowledgeItem]:
 	"""Synchronize discovered files into the knowledge-item index."""
 	if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
@@ -29,8 +33,14 @@ def index_local_directory(
 	root = Path(directory).resolve()
 	indexed_items = []
 	eligible_paths = set()
+	scan_errors: list[OSError] = []
+	records = scan_directory(directory, errors=scan_errors)
+	if scan_errors:
+		raise OSError(
+			f"Could not completely scan local folder {root}: {scan_errors[0]}"
+		) from scan_errors[0]
 
-	for record in scan_directory(directory):
+	for record in records:
 		location = str(Path(record.path).resolve())
 		if record.extension.lower() not in SUPPORTED_EXTENSIONS:
 			continue
@@ -42,9 +52,12 @@ def index_local_directory(
 		try:
 			content_hash = sha256_file(location)
 		except OSError as error:
-			item = _get_local_item(db, location)
+			item = _get_local_item(db, location, connector_id)
 			if item is None:
 				item = KnowledgeItem(
+					owner_id=owner_id,
+					connector_id=connector_id,
+					device_id=device_id,
 					source="local",
 					source_item_id=location,
 					title=metadata["filename"],
@@ -66,7 +79,7 @@ def index_local_directory(
 			continue
 
 		metadata["content_hash"] = content_hash
-		item = _get_local_item(db, location)
+		item = _get_local_item(db, location, connector_id)
 		if (
 			item is not None
 			and item.content_hash == content_hash
@@ -86,6 +99,9 @@ def index_local_directory(
 			"content_hash": metadata["content_hash"],
 		}
 		if item is not None:
+			item.owner_id = owner_id
+			item.connector_id = connector_id
+			item.device_id = device_id
 			db.execute(
 				delete(KnowledgeItemEmbedding).where(
 					KnowledgeItemEmbedding.item_id == item.id
@@ -100,6 +116,9 @@ def index_local_directory(
 			db.commit()
 		else:
 			item = KnowledgeItem(
+				owner_id=owner_id,
+				connector_id=connector_id,
+				device_id=device_id,
 				source="local",
 				source_item_id=metadata["path"],
 				processing_status="processing",
@@ -110,7 +129,7 @@ def index_local_directory(
 				db.commit()
 			except IntegrityError:
 				db.rollback()
-				if _get_local_item(db, location) is None:
+				if _get_local_item(db, location, connector_id) is None:
 					raise
 				continue
 
@@ -136,9 +155,15 @@ def index_local_directory(
 		db.refresh(item)
 		indexed_items.append(item)
 
-	for item in db.scalars(
-		select(KnowledgeItem).where(KnowledgeItem.source == "local")
-	).all():
+	statement = select(KnowledgeItem).where(KnowledgeItem.source == "local")
+	if connector_id is not None:
+		statement = statement.where(KnowledgeItem.connector_id == connector_id)
+	elif owner_id is not None:
+		statement = statement.where(
+			KnowledgeItem.owner_id == owner_id,
+			KnowledgeItem.connector_id.is_(None),
+		)
+	for item in db.scalars(statement).all():
 		if (
 			_is_beneath(Path(item.source_item_id), root)
 			and item.source_item_id not in eligible_paths
@@ -153,13 +178,18 @@ def index_local_directory(
 	return indexed_items
 
 
-def _get_local_item(db: Session, location: str) -> KnowledgeItem | None:
-	return db.scalar(
-		select(KnowledgeItem).where(
-			KnowledgeItem.source == "local",
-			KnowledgeItem.source_item_id == location,
-		)
+def _get_local_item(
+	db: Session, location: str, connector_id: str | None
+) -> KnowledgeItem | None:
+	statement = select(KnowledgeItem).where(
+		KnowledgeItem.source == "local",
+		KnowledgeItem.source_item_id == location,
 	)
+	if connector_id is None:
+		statement = statement.where(KnowledgeItem.connector_id.is_(None))
+	else:
+		statement = statement.where(KnowledgeItem.connector_id == connector_id)
+	return db.scalar(statement)
 
 
 def _set_processing_error(

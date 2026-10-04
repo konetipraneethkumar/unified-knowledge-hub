@@ -1,0 +1,133 @@
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem 1rem;
+  background:
+    radial-gradient(circle at 18% 18%, #e0f8ff 0, transparent 32%),
+    radial-gradient(circle at 84% 24%, #e7e4ff 0, transparent 34%),
+    #f8faff;
+  color: #081331;
+  font-family: Inter, "Segoe UI", sans-serif;
+}
+
+.auth-card {
+  width: min(100%, 28rem);
+  padding: 2.5rem;
+  border: 1px solid #e1e8f5;
+  border-radius: 1.25rem;
+  background: #ffffffed;
+  box-shadow: 0 24px 70px #29477d1c;
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #3156bc;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.auth-brand span {
+  font-size: 1.6rem;
+}
+
+.auth-eyebrow {
+  margin: 2rem 0 0.5rem;
+  color: #315db6;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  letter-spacing: -0.04em;
+}
+
+.auth-intro {
+  margin: 0.6rem 0 1.6rem;
+  color: #53617a;
+}
+
+.auth-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.auth-hint {
+  margin: -0.5rem 0 0;
+  color: #53617a;
+  font-size: 0.8rem;
+}
+
+.auth-error {
+  margin: 0;
+  border-radius: 0.4rem;
+  background: #fff0ee;
+  padding: 0.7rem 0.8rem;
+  color: #a33f35;
+  font-size: 0.9rem;
+}
+
+.auth-submit,
+.auth-google {
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1.25rem 0;
+  color: #6b7485;
+  font-size: 0.8rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  height: 1px;
+  flex: 1;
+  background: #e1e6ef;
+  content: "";
+}
+
+.auth-switch {
+  margin: 1.4rem 0 0.8rem;
+  color: #53617a;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.auth-switch button {
+  border: 0;
+  background: none;
+  color: #3156bc;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.auth-home {
+  display: block;
+  color: #53617a;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.landing-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: #3156bc;
+  font-family: Inter, "Segoe UI", sans-serif;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.75rem 1.25rem;
+  }
+}

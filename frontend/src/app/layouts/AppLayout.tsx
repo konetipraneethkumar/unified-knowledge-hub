@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { Header } from "../../components/ui/Header";
 import { Button } from "../../components/ui/Button";
 import { Sidebar } from "../../components/navigation/Sidebar";
+import { useAuth } from "../../features/auth/AuthContext";
 
 export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
   const transitionDuration = reduceMotion ? 0 : 0.18;
 
   useEffect(() => {
@@ -31,21 +35,39 @@ export function AppLayout() {
       <Header
         className="relative z-50"
         actions={
-          <Button
-            aria-controls="mobile-navigation"
-            aria-expanded={mobileMenuOpen}
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-            className="gap-2 px-3 md:hidden"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            variant="ghost"
-          >
-            <span aria-hidden="true" className="flex w-4 flex-col gap-1">
-              <span className="h-px w-full bg-current" />
-              <span className="h-px w-full bg-current" />
-              <span className="h-px w-full bg-current" />
-            </span>
-            <span className="sr-only">Menu</span>
-          </Button>
+          <>
+            {logoutError && <span className="text-sm text-error" role="alert">{logoutError}</span>}
+            <Button
+              className="px-2 sm:px-4"
+              onClick={() => {
+                setLogoutError("");
+                void logout()
+                  .then(() => navigate("/", { replace: true }))
+                  .catch((error: unknown) => {
+                    setLogoutError(error instanceof Error ? error.message : "Could not sign out.");
+                  });
+              }}
+              variant="secondary"
+            >
+              <span className="hidden sm:inline">Sign out</span>
+              <span className="sm:hidden">Exit</span>
+            </Button>
+            <Button
+              aria-controls="mobile-navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              className="gap-2 px-3 md:hidden"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              variant="ghost"
+            >
+              <span aria-hidden="true" className="flex w-4 flex-col gap-1">
+                <span className="h-px w-full bg-current" />
+                <span className="h-px w-full bg-current" />
+                <span className="h-px w-full bg-current" />
+              </span>
+              <span className="sr-only">Menu</span>
+            </Button>
+          </>
         }
       />
 

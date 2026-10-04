@@ -36,7 +36,7 @@ class MockEmbeddingService:
 
 
 def get_embedding_service() -> EmbeddingService:
-	if settings.EMBEDDING_PROVIDER.lower() != "mock":
+	if settings.EMBEDDING_PROVIDER.lower() not in {"mock", "local"}:
 		raise RuntimeError(
 			f"No embedding service is registered for provider "
 			f"{settings.EMBEDDING_PROVIDER!r}"

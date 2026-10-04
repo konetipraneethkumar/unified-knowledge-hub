@@ -51,3 +51,13 @@ class ConnectorRead(BaseModel):
     created_at: datetime
     last_sync_at: datetime | None
     revoked_at: datetime | None
+
+
+class ConnectorSyncResult(BaseModel):
+    connector_id: str
+    status: str
+    processed: int
+    skipped: int
+    failed: int
+    deleted: int
+    errors: list[str] = Field(default_factory=list)

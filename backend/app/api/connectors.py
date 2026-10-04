@@ -2,14 +2,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.models import Connector, Device, User
 from app.schemas.connectors import ConnectorCreate, ConnectorRead
+from app.api.connector_sync import queue_initial_sync
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
@@ -27,7 +29,7 @@ def list_connectors(current_user: User = Depends(get_current_user), db: Session 
 
 
 @router.post("", response_model=ConnectorRead, status_code=status.HTTP_201_CREATED)
-def create_connector(request: ConnectorCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Connector:
+def create_connector(request: ConnectorCreate, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Connector:
     if request.connector_type != "LOCAL":
         raise HTTPException(status_code=422, detail="Only LOCAL connectors are implemented")
     if request.device_id is None or request.authorized_root is None:
@@ -35,11 +37,20 @@ def create_connector(request: ConnectorCreate, current_user: User = Depends(get_
     device = db.scalar(select(Device).where(Device.id == request.device_id, Device.owner_id == current_user.id, Device.revoked_at.is_(None)))
     if device is None:
         raise HTTPException(status_code=404, detail="Active device not found")
-    root = Path(request.authorized_root).expanduser().resolve()
+    if not settings.LOCAL_STORAGE_ROOT:
+        raise HTTPException(status_code=503, detail="Local storage is not configured")
+    configured_root = Path(settings.LOCAL_STORAGE_ROOT).resolve()
+    requested_root = Path(request.authorized_root).resolve()
+    try:
+        requested_root.relative_to(configured_root)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Local connector path is outside the configured storage root")
+    root = requested_root
     connector = Connector(id=str(uuid.uuid4()), owner_id=current_user.id, device_id=device.id, connector_type="LOCAL", provider="local_filesystem", name=request.name.strip(), authorized_root=str(root))
     db.add(connector)
     db.commit()
     db.refresh(connector)
+    queue_initial_sync(background_tasks, connector)
     return connector
 
 

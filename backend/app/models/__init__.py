@@ -1,3 +1,3 @@
-from app.models.models import AuthToken, Connector, Device, KnowledgeItem, KnowledgeItemEmbedding, Pairing, User
+from app.models.models import Connector, ConnectorCredential, Device, KnowledgeItem, KnowledgeItemEmbedding, OAuthAccount, OAuthState, Pairing, RefreshToken, User
 
-__all__ = ["AuthToken", "Connector", "Device", "KnowledgeItem", "KnowledgeItemEmbedding", "Pairing", "User"]
+__all__ = ["Connector", "ConnectorCredential", "Device", "KnowledgeItem", "KnowledgeItemEmbedding", "OAuthAccount", "OAuthState", "Pairing", "RefreshToken", "User"]

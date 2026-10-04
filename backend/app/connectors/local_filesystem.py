@@ -30,20 +30,29 @@ class FileRecord:
 	modified_time: datetime
 
 
-def scan_directory(directory: str | os.PathLike[str]) -> list[FileRecord]:
+def scan_directory(
+	directory: str | os.PathLike[str],
+	*,
+	errors: list[OSError] | None = None,
+) -> list[FileRecord]:
 	"""Return metadata for regular files below a directory, without reading contents."""
 	root = os.fspath(directory)
 	records = []
 
+	def record_scan_error(error: OSError) -> None:
+		if errors is not None:
+			errors.append(error)
+
 	for current_directory, subdirectories, filenames in os.walk(
-		root, onerror=lambda error: None, followlinks=False
+		root, onerror=record_scan_error, followlinks=False
 	):
 		subdirectories.sort()
 		for filename in sorted(filenames):
 			file_path = Path(current_directory, filename)
 			try:
 				file_stat = os.stat(file_path, follow_symlinks=False)
-			except OSError:
+			except OSError as error:
+				record_scan_error(error)
 				continue
 
 			if not stat.S_ISREG(file_stat.st_mode):
