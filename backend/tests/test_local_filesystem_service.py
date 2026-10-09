@@ -14,6 +14,15 @@ from app.models import KnowledgeItem, KnowledgeItemEmbedding
 from app.services.local_filesystem import index_local_directory
 
 
+class RecordingEmbeddingService:
+	def __init__(self):
+		self.texts = []
+
+	def embed(self, texts):
+		self.texts.extend(texts)
+		return [[1.0, 0.0, 0.0] for _ in texts]
+
+
 class LocalFilesystemIndexingTests(unittest.TestCase):
 	def setUp(self):
 		self.engine = create_engine(
@@ -30,7 +39,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		Base.metadata.drop_all(self.engine)
 		self.engine.dispose()
 
-	def test_indexes_text_and_metadata_and_skips_unchanged_files(self):
+	def test_indexes_metadata_and_embedding_without_persisting_text(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
 			file_path = Path(temporary_directory) / "notes.txt"
 			file_content = b"private file contents"
@@ -65,12 +74,10 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		)
 		self.assertIsNone(item.summary)
 		self.assertEqual(item.content_hash, hashlib.sha256(file_content).hexdigest())
-		self.assertEqual(item.content, file_content.decode())
+		self.assertIsNone(item.content)
 		self.assertEqual(item.processing_status, "processed")
 		self.assertIsNone(item.processing_error)
-		self.assertIsNotNone(
-			self.db.get(KnowledgeItemEmbedding, item.id)
-		)
+		self.assertIsNotNone(self.db.get(KnowledgeItemEmbedding, item.id))
 
 	def test_hashes_identical_files_but_keeps_each_location(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
@@ -101,6 +108,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			items_by_name["first.txt"].location,
 			items_by_name["second.txt"].location,
 		)
+		self.assertTrue(all(item.content is None for item in indexed_items))
 		self.assertEqual(
 			len(list(self.db.scalars(select(KnowledgeItem)).all())), 3
 		)
@@ -118,7 +126,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		self.assertEqual(len(updated_items), 1)
 		self.assertEqual(updated_items[0].id, first_item.id)
 		self.assertNotEqual(updated_items[0].content_hash, first_hash)
-		self.assertEqual(updated_items[0].content, "second version")
+		self.assertIsNone(updated_items[0].content)
 		self.assertEqual(updated_items[0].processing_status, "processed")
 		self.assertEqual(
 			len(list(self.db.scalars(select(KnowledgeItem)).all())), 1
@@ -141,18 +149,25 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			list(self.db.scalars(select(KnowledgeItemEmbedding)).all()), []
 		)
 
-	def test_redacts_credentials_before_content_is_stored(self):
+	def test_redacts_credentials_before_embedding_and_never_persists_text(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
 			file_path = Path(temporary_directory) / "credentials.txt"
 			file_path.write_text(
 				"API_KEY=top-secret\nAuthorization: Bearer abc123",
 				encoding="utf-8",
 			)
-			item = index_local_directory(self.db, temporary_directory)[0]
+			embedding_service = RecordingEmbeddingService()
+			item = index_local_directory(
+				self.db, temporary_directory, embedding_service=embedding_service
+			)[0]
 
-		self.assertNotIn("top-secret", item.content)
-		self.assertNotIn("abc123", item.content)
-		self.assertEqual(item.content.count("[REDACTED]"), 2)
+		self.assertTrue(embedding_service.texts)
+		combined_text = "\n".join(embedding_service.texts)
+		self.assertNotIn("top-secret", combined_text)
+		self.assertNotIn("abc123", combined_text)
+		self.assertEqual(combined_text.count("[REDACTED]"), 2)
+		self.assertIsNone(item.content)
+		self.assertEqual(item.processing_status, "processed")
 
 	def test_failed_extraction_sets_error_and_retries_unchanged_file(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
@@ -171,6 +186,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 
 		self.assertEqual(processed_item.processing_status, "processed")
 		self.assertIsNone(processed_item.processing_error)
+		self.assertIsNone(processed_item.content)
 
 	def test_hash_failure_creates_failed_item_and_retries(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
@@ -186,7 +202,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			processed_item = index_local_directory(self.db, temporary_directory)[0]
 
 		self.assertEqual(processed_item.processing_status, "processed")
-		self.assertEqual(processed_item.content, "hash retry")
+		self.assertIsNone(processed_item.content)
 
 	def test_skips_file_with_credentials_in_its_path(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
