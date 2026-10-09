@@ -25,7 +25,7 @@ def index_local_directory(
 	chunk_size: int = 1200,
 	chunk_overlap: int = 150,
 ) -> list[KnowledgeItem]:
-	"""Extract, privacy-filter, embed, and reconcile local files beneath a directory."""
+	"""Index local-file metadata and embeddings without persisting extracted text."""
 	if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
 		raise ValueError("chunk_overlap must be nonnegative and smaller than chunk_size")
 	embedding_service = embedding_service or get_embedding_service()
@@ -138,7 +138,9 @@ def index_local_directory(
 					)
 				embedding = _mean_vector(vectors)
 				store_embedding(db, item.id, embedding)
-			item.content = text
+			# Extracted text is transient: use it to build embeddings, then discard
+			# it. The knowledge index stores metadata and vectors, not document text.
+			item.content = None
 			item.processing_status = "processed"
 			item.processing_error = None
 			db.commit()
