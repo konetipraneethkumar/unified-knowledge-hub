@@ -30,6 +30,21 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 		app.dependency_overrides[get_db] = override_get_db
 		self.client = TestClient(app)
 
+		# Search results are scoped to the authenticated user, so create a real
+		# test principal and use its bearer token in all API requests.
+		auth_response = self.client.post(
+			"/auth/register",
+			json={
+				"email": "search-api-test@example.com",
+				"password": "test-password-for-api",
+			},
+		)
+		self.assertEqual(auth_response.status_code, 201, auth_response.text)
+		self.user_id = auth_response.json()["user"]["id"]
+		self.client.headers.update(
+			{"Authorization": f"Bearer {auth_response.json()['access_token']}"}
+		)
+
 	def tearDown(self):
 		self.client.close()
 		app.dependency_overrides.pop(get_db, None)
@@ -57,18 +72,14 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 		)
 
 	def test_search_matches_all_requested_fields_case_insensitively(self):
-		self.create_item(
-			"title-1", title="Annual PLAN", summary="Roadmap", item_type="file"
-		)
-		self.create_item(
-			"summary-1", title="Notes", summary="Quarterly planning", item_type="file"
-		)
-		self.create_item(
-			"source-1", title="Notes", source="Quarterly Archive", item_type="file"
-		)
-		self.create_item(
-			"type-1", title="Notes", source="local", item_type="Quarterly report"
-		)
+		for source_item_id, kwargs in (
+			("title-1", {"title": "Annual PLAN", "summary": "Roadmap", "item_type": "file"}),
+			("summary-1", {"title": "Notes", "summary": "Quarterly planning", "item_type": "file"}),
+			("source-1", {"title": "Notes", "source": "Quarterly Archive", "item_type": "file"}),
+			("type-1", {"title": "Notes", "source": "local", "item_type": "Quarterly report"}),
+		):
+			response = self.create_item(source_item_id, **kwargs)
+			self.assertEqual(response.status_code, 201, response.text)
 
 		for query, expected_source_item_id in (
 			("annual", "title-1"),
@@ -98,6 +109,7 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 					item_type="file",
 					content="A distinctive searchable paragraph",
 					processing_status="processed",
+					owner_id=self.user_id,
 				)
 			)
 			db.commit()
@@ -171,9 +183,7 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.json()["total"], 1)
-		self.assertEqual(
-			response.json()["items"][0]["source_item_id"], "percent"
-		)
+		self.assertEqual(response.json()["items"][0]["source_item_id"], "percent")
 
 		injection_response = self.client.get(
 			"/search", params={"q": "' OR 1=1 --"}
