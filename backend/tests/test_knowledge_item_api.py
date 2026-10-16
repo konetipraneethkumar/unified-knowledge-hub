@@ -29,6 +29,20 @@ class KnowledgeItemApiTests(unittest.TestCase):
 		app.dependency_overrides[get_db] = override_get_db
 		self.client = TestClient(app)
 
+		# These endpoints are user-scoped. Authenticate the test client rather
+		# than bypassing the application's production authentication dependency.
+		auth_response = self.client.post(
+			"/auth/register",
+			json={
+				"email": "knowledge-items-test@example.com",
+				"password": "test-password-for-api",
+			},
+		)
+		self.assertEqual(auth_response.status_code, 201, auth_response.text)
+		self.client.headers.update(
+			{"Authorization": f"Bearer {auth_response.json()['access_token']}"}
+		)
+
 	def tearDown(self):
 		self.client.close()
 		app.dependency_overrides.pop(get_db, None)
@@ -44,6 +58,15 @@ class KnowledgeItemApiTests(unittest.TestCase):
 				"title": f"Notes {source_item_id}",
 			},
 		)
+
+	def test_knowledge_items_require_authentication(self):
+		unauthenticated_client = TestClient(app)
+		try:
+			response = unauthenticated_client.get("/knowledge-items")
+		finally:
+			unauthenticated_client.close()
+
+		self.assertEqual(response.status_code, 401)
 
 	def test_post_creates_and_persists_knowledge_item_across_requests(self):
 		response = self.create_item("item-1")
@@ -92,7 +115,9 @@ class KnowledgeItemApiTests(unittest.TestCase):
 		)
 
 	def test_get_knowledge_item_returns_item_and_404_for_missing_id(self):
-		created = self.create_item("item-1").json()
+		created_response = self.create_item("item-1")
+		self.assertEqual(created_response.status_code, 201, created_response.text)
+		created = created_response.json()
 
 		response = self.client.get(f"/knowledge-items/{created['id']}")
 		missing_response = self.client.get(
