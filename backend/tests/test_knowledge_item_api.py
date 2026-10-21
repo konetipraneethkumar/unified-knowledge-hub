@@ -94,6 +94,30 @@ class KnowledgeItemApiTests(unittest.TestCase):
 			["item-1", "item-2"],
 		)
 
+	def test_knowledge_item_count_is_scoped_to_current_user(self):
+		self.create_item("item-1")
+
+		response = self.client.get("/knowledge-items/count")
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json(), {"total": 1})
+
+	def test_knowledge_item_page_supports_owner_scoped_search_and_source_filter(self):
+		self.create_item("item-1")
+		self.create_item("item-2")
+
+		response = self.client.get(
+			"/knowledge-items/page",
+			params={"q": "item-2", "source": "local", "offset": 0, "limit": 10},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertEqual(payload["total"], 1)
+		self.assertEqual(len(payload["items"]), 1)
+		self.assertEqual(payload["items"][0]["source_item_id"], "item-2")
+		self.assertEqual(self.client.get("/knowledge-items/sources").json(), ["local"])
+
 	def test_get_knowledge_item_returns_item_and_404_for_missing_id(self):
 		created = self.create_item("item-1").json()
 

@@ -15,7 +15,7 @@ export function EmptyChatState({ onSelectSuggestion, suggestions }: EmptyChatSta
             Search your memory
           </Typography>
           <Typography variant="secondary">
-            Ask about mentors, projects, recent work, and the documents behind your knowledge graph.
+            Ask a question about information in your indexed sources and review the evidence behind each answer.
           </Typography>
         </div>
 

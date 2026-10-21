@@ -32,6 +32,17 @@ def connect(kind: str, current_user: User = Depends(get_current_active_user), db
     return RedirectResponse(authorization_url(redirect_uri=redirect_uri, scope=scope, state=state))
 
 
+@router.get("/{kind}/connect-url")
+def connect_url(
+    kind: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    _, redirect_uri, scope = _config(kind)
+    state = create_oauth_state(db, user_id=current_user.id, purpose=f"connector:{kind}")
+    return {"url": authorization_url(redirect_uri=redirect_uri, scope=scope, state=state)}
+
+
 @router.get("/{kind}/callback")
 def callback(
     kind: str,

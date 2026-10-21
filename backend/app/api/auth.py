@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import consume_oauth_state, create_oauth_state, get_current_active_user, issue_access_token, issue_refresh_token, password_hasher, rotate_refresh_token
 from app.models import OAuthAccount, RefreshToken, User
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, SessionRead, UserRead
+from app.schemas.auth import LoginRequest, ProfileUpdateRequest, RefreshRequest, RegisterRequest, SessionRead, UserRead
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -58,6 +58,18 @@ def logout(current_user: User = Depends(get_current_active_user), db: Session = 
 
 @router.get("/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_active_user)) -> User: return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me(
+    request: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> User:
+    current_user.display_name = request.display_name.strip() if request.display_name else None
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 
 @router.get("/google/login")

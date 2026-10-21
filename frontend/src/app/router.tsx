@@ -5,6 +5,8 @@ import {
   ConnectorsPage,
   DashboardPage,
   HistoryPage,
+  KnowledgePage,
+  ProfilePage,
   SettingsPage,
 } from "../features/workspace/WorkspacePages";
 import { LandingRoute } from "../pages/LandingRoute";
@@ -37,10 +39,11 @@ export const router = createBrowserRouter([
         children: [
           { path: "search", element: <ChatPage /> },
           { path: "dashboard", element: <DashboardPage /> },
-          { path: "knowledge", element: <Navigate to="/dashboard" replace /> },
+          { path: "knowledge", element: <KnowledgePage /> },
           { path: "connectors", element: <ConnectorsPage /> },
           { path: "sync", element: <Navigate to="/connectors" replace /> },
           { path: "history", element: <HistoryPage /> },
+          { path: "profile", element: <ProfilePage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

@@ -48,6 +48,8 @@ class ConnectorRead(BaseModel):
     status: str
     authentication_status: str
     authorized_root: str | None
+    external_account_id: str | None = None
+    indexed_item_count: int | None = None
     created_at: datetime
     last_sync_at: datetime | None
     revoked_at: datetime | None

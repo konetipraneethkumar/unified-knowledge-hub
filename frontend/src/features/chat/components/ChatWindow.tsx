@@ -10,7 +10,9 @@ import type { ChatMessage } from "../types";
 type ChatWindowProps = {
   draft: string;
   isLoading: boolean;
+  mode: "ask" | "search";
   messages: ChatMessage[];
+  onChangeMode: (mode: "ask" | "search") => void;
   onChangeDraft: Dispatch<SetStateAction<string>>;
   onRetry: () => void;
   onSelectSuggestion: (query: string) => void;
@@ -23,7 +25,9 @@ type ChatWindowProps = {
 export function ChatWindow({
   draft,
   isLoading,
+  mode,
   messages,
+  onChangeMode,
   onChangeDraft,
   onRetry,
   onSelectSuggestion,
@@ -35,14 +39,19 @@ export function ChatWindow({
   return (
     <section className="mx-auto flex h-full w-full max-w-6xl flex-col px-4 py-4 sm:px-6 lg:px-8">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface/70 shadow-card backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-6">
           <div>
             <Typography as="h1" variant="pageTitle" className="text-2xl sm:text-3xl">
-              New Query
+              Search
             </Typography>
             <Typography className="mt-1" variant="secondary">
-              Ask your knowledge base.
+              Ask across your indexed knowledge.
             </Typography>
+          </div>
+
+          <div className="flex shrink-0 rounded-lg border border-line bg-surface p-1" role="group" aria-label="Search mode">
+            <button aria-pressed={mode === "ask"} className={`min-h-9 rounded-md px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-focus-ring ${mode === "ask" ? "bg-forest text-white" : "text-ink-muted hover:bg-surface-muted"}`} onClick={() => onChangeMode("ask")} type="button">Ask</button>
+            <button aria-pressed={mode === "search"} className={`min-h-9 rounded-md px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-focus-ring ${mode === "search" ? "bg-forest text-white" : "text-ink-muted hover:bg-surface-muted"}`} onClick={() => onChangeMode("search")} type="button">Search</button>
           </div>
 
           {pageActions}
@@ -76,7 +85,7 @@ export function ChatWindow({
                 onClick={onSubmit}
                 type="button"
               >
-                {isLoading ? "Sending..." : "Send"}
+                {isLoading ? (mode === "ask" ? "Answering…" : "Searching…") : (mode === "ask" ? "Ask" : "Search")}
               </Button>
             </div>
           </div>

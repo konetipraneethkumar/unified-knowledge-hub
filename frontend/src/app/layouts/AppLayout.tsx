@@ -1,19 +1,35 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Outlet, useLocation, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Header } from "../../components/ui/Header";
 import { Button } from "../../components/ui/Button";
 import { Sidebar } from "../../components/navigation/Sidebar";
 import { useAuth } from "../../features/auth/AuthContext";
+import { readPreferences } from "../../features/workspace/api";
 
 export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [logoutError, setLogoutError] = useState("");
   const transitionDuration = reduceMotion ? 0 : 0.18;
+
+  useEffect(() => {
+    if (!user) return;
+    const applyTheme = () => {
+      document.documentElement.dataset.theme = readPreferences(user.id).theme;
+    };
+    const onPreferenceChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: number }>).detail;
+      if (detail?.userId === user.id) applyTheme();
+    };
+    applyTheme();
+    window.addEventListener("smriti-preferences-changed", onPreferenceChange);
+    return () => window.removeEventListener("smriti-preferences-changed", onPreferenceChange);
+  }, [user]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -37,21 +53,37 @@ export function AppLayout() {
         actions={
           <>
             {logoutError && <span className="text-sm text-error" role="alert">{logoutError}</span>}
-            <Button
-              className="px-2 sm:px-4"
-              onClick={() => {
-                setLogoutError("");
-                void logout()
-                  .then(() => navigate("/", { replace: true }))
-                  .catch((error: unknown) => {
-                    setLogoutError(error instanceof Error ? error.message : "Could not sign out.");
-                  });
-              }}
-              variant="secondary"
-            >
-              <span className="hidden sm:inline">Sign out</span>
-              <span className="sm:hidden">Exit</span>
-            </Button>
+            <details className="relative">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-left text-sm text-ink hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-focus-ring sm:gap-3 sm:px-3">
+                {user?.avatar_url
+                  ? <img alt="" className="size-7 rounded-full object-cover" src={user.avatar_url} />
+                  : <span aria-hidden="true" className="flex size-7 items-center justify-center rounded-full bg-forest-soft text-xs font-semibold text-forest">{(user?.display_name || user?.email || "U").slice(0, 1).toUpperCase()}</span>}
+                <span className="hidden max-w-36 truncate sm:inline">{user?.display_name || user?.email}</span>
+                <span aria-hidden="true" className="text-xs">⌄</span>
+              </summary>
+              <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-surface p-2 shadow-card">
+                <div className="border-b border-line px-3 py-2">
+                  <p className="truncate text-sm font-medium text-ink">{user?.display_name || user?.email}</p>
+                  {user?.display_name && <p className="truncate text-xs text-ink-muted">{user.email}</p>}
+                </div>
+                <Link className="block rounded-md px-3 py-2 text-sm text-ink hover:bg-surface-muted" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); }} to="/profile">Profile</Link>
+                <Link className="block rounded-md px-3 py-2 text-sm text-ink hover:bg-surface-muted" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); }} to="/settings">Settings</Link>
+                <Button
+                  className="mt-1 w-full justify-start"
+                  onClick={() => {
+                    setLogoutError("");
+                    void logout()
+                      .then(() => navigate("/", { replace: true }))
+                      .catch((error: unknown) => {
+                        setLogoutError(error instanceof Error ? error.message : "Could not sign out.");
+                      });
+                  }}
+                  variant="ghost"
+                >
+                  Sign out
+                </Button>
+              </div>
+            </details>
             <Button
               aria-controls="mobile-navigation"
               aria-expanded={mobileMenuOpen}

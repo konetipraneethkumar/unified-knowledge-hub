@@ -22,6 +22,7 @@ type AuthContextValue = {
     password: string,
     displayName: string,
   ) => Promise<void>;
+  updateProfile: (displayName: string) => Promise<User>;
   logout: () => Promise<void>;
 };
 
@@ -35,6 +36,10 @@ function saveSession(session: AuthSession) {
 function clearSession() {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export function getAccessToken() {
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -138,6 +143,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateProfile = useCallback(async (displayName: string) => {
+    const accessToken = getAccessToken();
+    if (!accessToken) {
+      throw new ApiError("Your session has expired. Please sign in again.", 401);
+    }
+    const updatedUser = await apiRequest<User>("/api/v1/auth/me", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ display_name: displayName.trim() || null }),
+    });
+    setUser(updatedUser);
+    return updatedUser;
+  }, []);
+
   const logout = useCallback(async () => {
     const accessToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
     const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
@@ -146,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await apiRequest<void>("/api/v1/auth/logout", {
             method: "POST",
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: { Authorization: `Bearer ${refreshed.access_token}` },
           });
         } catch (error) {
           if (!(error instanceof ApiError) || error.status !== 401 || !refreshToken) {
@@ -170,8 +192,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout }),
-    [user, isLoading, login, register, logout],
+    () => ({ user, isLoading, login, register, updateProfile, logout }),
+    [user, isLoading, login, register, updateProfile, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.ingestion.sources import IngestionResult, index_source_documents
-from app.models import Connector, ConnectorCredential, Device, KnowledgeItem
+from app.models import (
+	Connector,
+	ConnectorCredential,
+	ConnectorSyncActivity,
+	Device,
+	KnowledgeItem,
+)
 from app.schemas.connectors import ConnectorSyncResult
 from app.sync.google import (
 	GoogleSourceError,
@@ -46,6 +52,15 @@ def run_connector_sync(db: Session, connector: Connector) -> ConnectorSyncResult
 		current_connector = db.get(Connector, connector.id)
 		if current_connector is not None:
 			current_connector.status = "error"
+			db.add(
+				ConnectorSyncActivity(
+					owner_id=current_connector.owner_id,
+					connector_id=current_connector.id,
+					connector_name=current_connector.name,
+					connector_type=current_connector.connector_type,
+					status="failed",
+				)
+			)
 			db.commit()
 		raise
 
@@ -54,6 +69,19 @@ def run_connector_sync(db: Session, connector: Connector) -> ConnectorSyncResult
 		raise HTTPException(status_code=404, detail="Connector was removed during sync.")
 	connector.status = "active"
 	connector.last_sync_at = datetime.now(timezone.utc)
+	db.add(
+		ConnectorSyncActivity(
+			owner_id=connector.owner_id,
+			connector_id=connector.id,
+			connector_name=connector.name,
+			connector_type=connector.connector_type,
+			status="completed_with_errors" if result.failed else "completed",
+			processed=result.processed,
+			skipped=result.skipped,
+			failed=result.failed,
+			deleted=result.deleted,
+		)
+	)
 	db.commit()
 	return ConnectorSyncResult(
 		connector_id=connector.id,

@@ -3,13 +3,13 @@ from pathlib import Path
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.security import get_current_user
-from app.models import Connector, Device, User
+from app.models import Connector, Device, KnowledgeItem, User
 from app.schemas.connectors import ConnectorCreate, ConnectorRead
 from app.api.connector_sync import queue_initial_sync
 
@@ -24,8 +24,31 @@ def _owned_connector(db: Session, connector_id: str, user_id: int) -> Connector:
 
 
 @router.get("", response_model=list[ConnectorRead])
-def list_connectors(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[Connector]:
-    return list(db.scalars(select(Connector).where(Connector.owner_id == current_user.id).order_by(Connector.created_at)).all())
+def list_connectors(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[ConnectorRead]:
+    connectors = list(
+        db.scalars(
+            select(Connector)
+            .where(Connector.owner_id == current_user.id)
+            .order_by(Connector.created_at)
+        ).all()
+    )
+    counts = dict(
+        db.execute(
+            select(KnowledgeItem.connector_id, func.count(KnowledgeItem.id))
+            .where(
+                KnowledgeItem.owner_id == current_user.id,
+                KnowledgeItem.connector_id.is_not(None),
+            )
+            .group_by(KnowledgeItem.connector_id)
+        ).all()
+    )
+    return [
+        {
+            **ConnectorRead.model_validate(connector).model_dump(),
+            "indexed_item_count": counts.get(connector.id, 0),
+        }
+        for connector in connectors
+    ]
 
 
 @router.post("", response_model=ConnectorRead, status_code=status.HTTP_201_CREATED)

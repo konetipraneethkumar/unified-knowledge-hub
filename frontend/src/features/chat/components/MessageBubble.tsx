@@ -29,7 +29,7 @@ export function MessageBubble({ message, reduceMotion }: MessageBubbleProps) {
         >
           <div className="flex items-center justify-between gap-3">
             <Badge className={isUser ? "bg-white/10 text-white" : "bg-surface-muted text-ink-muted"}>
-              {isUser ? "You" : "Assistant"}
+              {isUser ? "You" : message.answerMode === "search" ? "Ranked search" : "SMRITI"}
             </Badge>
             <Typography
               variant="caption"
@@ -47,10 +47,16 @@ export function MessageBubble({ message, reduceMotion }: MessageBubbleProps) {
             {message.content}
           </Typography>
 
+          {message.noResults && (
+            <Typography as="p" variant="secondary" className="mt-3 text-ink-muted">
+              No relevant sources were found.
+            </Typography>
+          )}
+
           {message.sources && message.sources.length > 0 && (
             <div className="mt-5">
-              <Typography variant="secondary" className={isUser ? "text-white/80" : "text-ink-muted"}>
-                Sources
+              <Typography as="h2" variant="secondary" className={isUser ? "text-white/80" : "text-ink-muted"}>
+                {message.answerMode === "search" ? "Ranked matches" : "Sources"}
               </Typography>
               <SourceList sources={message.sources} />
             </div>

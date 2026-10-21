@@ -185,7 +185,7 @@ def _fetch_drive_documents(api: GoogleApi) -> list[SourceDocument]:
 			"orderBy": "modifiedTime desc",
 			"fields": (
 				"nextPageToken,files(id,name,mimeType,modifiedTime,createdTime,"
-				"webViewLink,size)"
+				"webViewLink,size,parents)"
 			),
 		}
 		if page_token:
@@ -240,6 +240,7 @@ def _drive_document(api: GoogleApi, record: dict) -> SourceDocument | None:
 		)
 	if content is None:
 		return None
+	parent_ids = record.get("parents", [])
 	return SourceDocument(
 		source_item_id=file_id,
 		title=title,
@@ -252,6 +253,17 @@ def _drive_document(api: GoogleApi, record: dict) -> SourceDocument | None:
 		file_created_at=created_at,
 		modified_at=modified_at,
 		location=record.get("webViewLink"),
+		parent_location=(
+			" / ".join(parent_ids)
+			if isinstance(parent_ids, list)
+			and all(isinstance(parent_id, str) for parent_id in parent_ids)
+			else None
+		),
+		web_url=record.get("webViewLink"),
+		source_metadata={
+			"drive_file_id": file_id,
+			"parent_ids": parent_ids,
+		},
 	)
 
 
@@ -261,6 +273,7 @@ def _failed_drive_document(record: dict, error: str) -> SourceDocument:
 	title = record.get("name")
 	if not isinstance(file_id, str) or not isinstance(title, str):
 		raise GoogleSourceError(502, "Google returned a file without a valid id or name.")
+	parent_ids = record.get("parents", [])
 	return SourceDocument(
 		source_item_id=file_id,
 		title=title,
@@ -275,6 +288,17 @@ def _failed_drive_document(record: dict, error: str) -> SourceDocument:
 		),
 		modified_at=_parse_google_time(record.get("modifiedTime")),
 		location=record.get("webViewLink"),
+		parent_location=(
+			" / ".join(parent_ids)
+			if isinstance(parent_ids, list)
+			and all(isinstance(parent_id, str) for parent_id in parent_ids)
+			else None
+		),
+		web_url=record.get("webViewLink"),
+		source_metadata={
+			"drive_file_id": file_id,
+			"parent_ids": parent_ids,
+		},
 		processing_error=error,
 	)
 
@@ -378,7 +402,12 @@ def _gmail_message_document(message_id: str, message: dict) -> SourceDocument | 
 		value for value in (f"Subject: {subject}", f"From: {sender}", f"Date: {date}", body)
 		if value
 	)
-	thread_id = message.get("threadId", message_id)
+	thread_id = message.get("threadId")
+	web_url = (
+		f"https://mail.google.com/mail/u/0/#all/{thread_id}"
+		if isinstance(thread_id, str) and thread_id
+		else None
+	)
 	return SourceDocument(
 		source_item_id=message_id,
 		title=subject[:500],
@@ -388,7 +417,15 @@ def _gmail_message_document(message_id: str, message: dict) -> SourceDocument | 
 		mime_type="message/rfc822",
 		file_size_bytes=message.get("sizeEstimate"),
 		modified_at=_parse_email_date(date),
-		location=f"https://mail.google.com/mail/u/0/#all/{thread_id}",
+		location=web_url,
+		web_url=web_url,
+		source_metadata={
+			"sender": sender or None,
+			"subject": subject,
+			"message_id": message_id,
+			"thread_id": thread_id,
+			"date_header": date or None,
+		},
 	)
 
 
@@ -496,6 +533,7 @@ def _classroom_text_document(
 ) -> SourceDocument:
 	resource_id = record.get("id")
 	content_parts = [f"Course: {course_name}", f"Title: {title}"]
+	attachments = []
 	for field in ("description", "text", "state", "alternateLink"):
 		value = record.get(field)
 		if isinstance(value, str) and value:
@@ -508,6 +546,16 @@ def _classroom_text_document(
 				resource_title = resource.get("title") or resource.get("url") or resource.get("formUrl")
 				if resource_title:
 					content_parts.append(f"Resource: {resource_title}")
+					attachments.append(
+						{
+							"type": key,
+							"title": resource.get("title"),
+							"id": resource.get("id"),
+							"url": resource.get("url")
+							or resource.get("alternateLink")
+							or resource.get("formUrl"),
+						}
+					)
 	return SourceDocument(
 		source_item_id=f"{course_id}:{collection}:{resource_id or title}",
 		title=f"{course_name}: {title}"[:500],
@@ -517,6 +565,15 @@ def _classroom_text_document(
 		mime_type="text/plain",
 		modified_at=_parse_google_time(record.get("updateTime")),
 		location=record.get("alternateLink"),
+		parent_location=f"Google Classroom course: {course_name}",
+		web_url=record.get("alternateLink"),
+		source_metadata={
+			"course_id": course_id,
+			"course_name": course_name,
+			"resource_id": resource_id,
+			"resource_type": collection,
+			"attachments": attachments,
+		},
 	)
 
 

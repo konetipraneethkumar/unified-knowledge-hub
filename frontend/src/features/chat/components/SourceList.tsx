@@ -9,7 +9,7 @@ export function SourceList({ sources }: SourceListProps) {
   return (
     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {sources.map((source) => (
-        <SourceCard key={source.id} source={source} />
+        <SourceCard key={source.source_id} source={source} />
       ))}
     </div>
   );

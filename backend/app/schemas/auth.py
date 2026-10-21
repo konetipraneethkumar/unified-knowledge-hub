@@ -18,6 +18,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=32, max_length=512)
 
 
+class ProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: str | None = Field(default=None, max_length=255)
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

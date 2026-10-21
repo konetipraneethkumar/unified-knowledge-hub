@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.activity import router as activity_router
 from app.api.connector_sync import router as connector_sync_router
 from app.api.connectors import router as connectors_router
 from app.api.devices import router as devices_router
@@ -19,6 +20,7 @@ app.add_middleware(
 	allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(auth_router)
+app.include_router(activity_router)
 app.include_router(connector_sync_router)
 app.include_router(devices_router)
 app.include_router(connectors_router)

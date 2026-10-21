@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -93,6 +93,36 @@ class Connector(Base):
     scopes: Mapped[str | None] = mapped_column(Text)
 
 
+class SearchHistory(Base):
+    __tablename__ = "search_history"
+    __table_args__ = (Index("ix_search_history_owner_created", "owner_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(String(16), default="ask", server_default="ask", nullable=False)
+    result_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    source_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ConnectorSyncActivity(Base):
+    __tablename__ = "connector_sync_activity"
+    __table_args__ = (Index("ix_sync_activity_owner_created", "owner_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    connector_id: Mapped[str | None] = mapped_column(ForeignKey("connectors.id", ondelete="SET NULL"), index=True)
+    connector_name: Mapped[str] = mapped_column(String, nullable=False)
+    connector_type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    processed: Mapped[int | None] = mapped_column(default=None)
+    skipped: Mapped[int | None] = mapped_column(default=None)
+    failed: Mapped[int | None] = mapped_column(default=None)
+    deleted: Mapped[int | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ConnectorCredential(Base):
     __tablename__ = "connector_credentials"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -125,6 +155,10 @@ class KnowledgeItem(Base):
 		DateTime(timezone=True)
 	)
 	location: Mapped[str | None] = mapped_column(Text)
+	parent_location: Mapped[str | None] = mapped_column(Text)
+	web_url: Mapped[str | None] = mapped_column(Text)
+	file_path: Mapped[str | None] = mapped_column(Text)
+	source_metadata: Mapped[dict | None] = mapped_column(JSON)
 	summary: Mapped[str | None] = mapped_column(Text)
 	content: Mapped[str | None] = mapped_column(Text)
 	processing_status: Mapped[str] = mapped_column(

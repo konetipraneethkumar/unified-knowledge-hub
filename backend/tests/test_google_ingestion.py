@@ -22,6 +22,7 @@ class GoogleIngestionTests(unittest.TestCase):
 							"name": "Project notes",
 							"mimeType": "application/vnd.google-apps.document",
 							"webViewLink": "https://drive.google.com/file/d/doc-1",
+							"parents": ["folder-1"],
 						},
 						{
 							"id": "folder-1",
@@ -43,6 +44,15 @@ class GoogleIngestionTests(unittest.TestCase):
 		self.assertEqual(documents[0].source_item_id, "doc-1")
 		self.assertEqual(documents[0].file_extension, ".txt")
 		self.assertEqual(documents[0].content, "notes from Google Docs")
+		self.assertEqual(
+			documents[0].source_metadata,
+			{"drive_file_id": "doc-1", "parent_ids": ["folder-1"]},
+		)
+		self.assertEqual(documents[0].parent_location, "folder-1")
+		self.assertEqual(
+			documents[0].web_url, "https://drive.google.com/file/d/doc-1"
+		)
+		self.assertIsNone(documents[0].file_path)
 		self.assertEqual(api.export_params, {"mimeType": "text/plain"})
 		self.assertEqual(api.list_url, "https://www.googleapis.com/drive/v3/files")
 
@@ -70,6 +80,17 @@ class GoogleIngestionTests(unittest.TestCase):
 		self.assertEqual(document.title, "Project meeting")
 		self.assertIn("Meeting notes for the project", document.content)
 		self.assertEqual(document.location, "https://mail.google.com/mail/u/0/#all/thread-1")
+		self.assertEqual(
+			document.source_metadata,
+			{
+				"sender": "member@example.com",
+				"subject": "Project meeting",
+				"message_id": "message-1",
+				"thread_id": "thread-1",
+				"date_header": "Sun, 04 Oct 2026 10:00:00 +0000",
+			},
+		)
+		self.assertEqual(document.web_url, document.location)
 		self.assertIsNotNone(document.modified_at)
 
 	def test_gmail_prefers_plain_text_over_html_and_removes_scripts(self):
@@ -114,6 +135,25 @@ class GoogleIngestionTests(unittest.TestCase):
 		self.assertIn("Read before class", document.content)
 		self.assertIn("Reading list", document.content)
 		self.assertEqual(document.location, "https://classroom.google.com/c/course-1")
+		self.assertEqual(
+			document.source_metadata,
+			{
+				"course_id": "course-1",
+				"course_name": "Biology",
+				"resource_id": "material-1",
+				"resource_type": "courseWorkMaterials",
+				"attachments": [
+					{
+						"type": "link",
+						"title": "Reading list",
+						"id": None,
+						"url": "https://example.com/read",
+					}
+				],
+			},
+		)
+		self.assertEqual(document.parent_location, "Google Classroom course: Biology")
+		self.assertEqual(document.web_url, document.location)
 
 
 if __name__ == "__main__":

@@ -67,6 +67,8 @@ def index_local_directory(
 					file_size_bytes=metadata["size"],
 					file_created_at=metadata["created_time"],
 					location=metadata["path"],
+					parent_location=str(Path(location).parent),
+					file_path=location,
 					modified_at=metadata["modified_time"],
 					processing_status="failed",
 				)
@@ -80,13 +82,6 @@ def index_local_directory(
 
 		metadata["content_hash"] = content_hash
 		item = _get_local_item(db, location, connector_id)
-		if (
-			item is not None
-			and item.content_hash == content_hash
-			and item.processing_status == "processed"
-		):
-			continue
-
 		item_metadata = {
 			"title": metadata["filename"],
 			"item_type": "file",
@@ -95,9 +90,25 @@ def index_local_directory(
 			"file_size_bytes": metadata["size"],
 			"file_created_at": metadata["created_time"],
 			"location": metadata["path"],
+			"parent_location": str(Path(location).parent),
+			"file_path": location,
 			"modified_at": metadata["modified_time"],
 			"content_hash": metadata["content_hash"],
 		}
+		if (
+			item is not None
+			and item.content_hash == content_hash
+			and item.processing_status == "processed"
+		):
+			if any(
+				getattr(item, field) != value
+				for field, value in item_metadata.items()
+			):
+				for field, value in item_metadata.items():
+					setattr(item, field, value)
+				db.commit()
+			continue
+
 		if item is not None:
 			item.owner_id = owner_id
 			item.connector_id = connector_id

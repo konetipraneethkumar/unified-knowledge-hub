@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -27,6 +28,10 @@ class SourceDocument:
 	file_created_at: datetime | None = None
 	modified_at: datetime | None = None
 	location: str | None = None
+	parent_location: str | None = None
+	web_url: str | None = None
+	file_path: str | None = None
+	source_metadata: dict[str, Any] | None = None
 	processing_error: str | None = None
 
 
@@ -80,6 +85,10 @@ def index_source_documents(
 					file_size_bytes=document.file_size_bytes,
 					file_created_at=document.file_created_at,
 					location=safe_metadata["path"] or None,
+					parent_location=document.parent_location,
+					web_url=document.web_url,
+					file_path=document.file_path,
+					source_metadata=document.source_metadata,
 					modified_at=document.modified_at,
 					processing_status="failed",
 					processing_error=document.processing_error[:2000],
@@ -88,6 +97,10 @@ def index_source_documents(
 			else:
 				item.title = safe_metadata["filename"]
 				item.location = safe_metadata["path"] or None
+				item.parent_location = document.parent_location
+				item.web_url = document.web_url
+				item.file_path = document.file_path
+				item.source_metadata = document.source_metadata
 				item.modified_at = document.modified_at
 				item.processing_status = "failed"
 				item.processing_error = document.processing_error[:2000]
@@ -112,6 +125,10 @@ def index_source_documents(
 				file_size_bytes=document.file_size_bytes,
 				file_created_at=document.file_created_at,
 				location=safe_metadata["path"] or None,
+				parent_location=document.parent_location,
+				web_url=document.web_url,
+				file_path=document.file_path,
+				source_metadata=document.source_metadata,
 				modified_at=document.modified_at,
 				content_hash=content_hash,
 				processing_status="processing",
@@ -131,8 +148,13 @@ def index_source_documents(
 			item.file_size_bytes = document.file_size_bytes
 			item.file_created_at = document.file_created_at
 			item.location = safe_metadata["path"] or None
+			item.parent_location = document.parent_location
+			item.web_url = document.web_url
+			item.file_path = document.file_path
+			item.source_metadata = document.source_metadata
 			item.modified_at = document.modified_at
 			if not changed and item.processing_status == "processed":
+				db.commit()
 				skipped += 1
 				continue
 

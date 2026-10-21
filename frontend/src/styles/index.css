@@ -40,6 +40,25 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme="dark"] {
+  --background: #1b211d;
+  --surface: #242c27;
+  --surface-muted: #303a34;
+  --text-primary: #f1f3ef;
+  --text-secondary: #c0c8c1;
+  --border: #46534a;
+  --bronze: #c6a16e;
+  --bronze-hover: #d1b181;
+  --forest: #abc7b2;
+  --forest-soft: #303e35;
+  --error: #ffaaa0;
+  --success: #a8d3ad;
+  --warning: #eac58e;
+  --warning-soft: #423a2c;
+  --focus-ring: #d5b486;
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-canvas: var(--background);
   --color-surface: var(--surface);
