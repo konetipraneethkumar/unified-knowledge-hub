@@ -1,8 +1,8 @@
 # Unified Knowledge Hub
 
-**Privacy-first Personal Data Vault + AI Search Engine**
+**Privacy-Aware Hybrid AI Search and Retrieval Platform**
 
-Unified Knowledge Hub enables cross-source discovery across exactly four authorized sources: Gmail, Google Drive, Google Classroom, and Local Storage. It indexes approved metadata, summaries, keywords, embeddings, and source locators so users can search once and open original resources when accessible.
+Unified Knowledge Hub helps users discover information across authorized data sources—Gmail, Google Drive, Google Classroom, and Local Storage—without permanently storing the original documents in a central database. It indexes selected metadata, concise summaries, keywords, embeddings, and source locators to support unified keyword and semantic search. When a user needs the original resource, the system can direct them to it or retrieve content through authorized access, subject to the source's availability and permissions.
 
 ## Start here
 
