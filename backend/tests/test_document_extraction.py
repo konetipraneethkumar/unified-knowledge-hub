@@ -10,7 +10,7 @@ from app.ingestion.extraction import extract_document_text
 
 class DocumentExtractionTests(unittest.TestCase):
 	def test_extracts_plain_text_markdown_csv_and_json(self):
-		with tempfile.TemporaryDirectory() as temporary_directory:
+		with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary_directory:
 			root = Path(temporary_directory)
 			(root / "note.txt").write_text("plain text", encoding="utf-8")
 			(root / "note.md").write_text("# heading", encoding="utf-8")
@@ -32,7 +32,7 @@ class DocumentExtractionTests(unittest.TestCase):
 		from pptx import Presentation
 		from pptx.util import Inches
 
-		with tempfile.TemporaryDirectory() as temporary_directory:
+		with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary_directory:
 			root = Path(temporary_directory)
 			document_path = root / "document.docx"
 			document = Document()

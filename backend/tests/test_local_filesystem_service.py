@@ -8,9 +8,24 @@ from unittest.mock import patch
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-from app.models import KnowledgeItem, KnowledgeItemEmbedding
-from app.sync.local_filesystem import index_local_directory
-from _postgres_test_db import create_postgres_test_engine
+from app.models import Connector, Device, KnowledgeItem, KnowledgeItemEmbedding, User
+from app.sync.local_filesystem import index_local_directory as _index_local_directory
+from tests._postgres_test_db import create_postgres_test_engine
+
+
+def index_local_directory(db, directory, **kwargs):
+	"""Test wrapper supplying the required registered local context."""
+	connector = db.get(Connector, "connector-1")
+	connector.authorized_root = str(Path(directory).resolve())
+	db.commit()
+	return _index_local_directory(
+		db,
+		directory,
+		owner_id=1,
+		connector_id=connector.id,
+		device_id=connector.device_id,
+		**kwargs,
+	)
 
 
 class RecordingEmbeddingService:
@@ -22,11 +37,20 @@ class RecordingEmbeddingService:
 		return [[1.0, 0.0, 0.0] for _ in texts]
 
 
+class FailingEmbeddingService:
+	def embed(self, texts):
+		raise RuntimeError("embedding provider unavailable")
+
+
 class LocalFilesystemIndexingTests(unittest.TestCase):
 	def setUp(self):
 		self.engine, self.cleanup_database = create_postgres_test_engine()
 		self.session_factory = sessionmaker(bind=self.engine)
 		self.db = self.session_factory()
+		self.db.add(User(id=1, email="local-index@example.invalid", password_hash="test"))
+		self.db.add(Device(id="device-1", owner_id=1, name="test", credential_hash="credential"))
+		self.db.add(Connector(id="connector-1", owner_id=1, device_id="device-1", connector_type="LOCAL", provider="local_filesystem", name="test", authorized_root=str(Path.cwd()), status="active"))
+		self.db.commit()
 
 	def tearDown(self):
 		self.db.close()
@@ -67,7 +91,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		)
 		self.assertIsNone(item.summary)
 		self.assertEqual(item.content_hash, hashlib.sha256(file_content).hexdigest())
-		self.assertIsNone(item.content)
+		self.assertFalse(hasattr(item, "content"))
 		self.assertEqual(item.processing_status, "processed")
 		self.assertIsNone(item.processing_error)
 		self.assertIsNotNone(self.db.get(KnowledgeItemEmbedding, item.id))
@@ -101,7 +125,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			items_by_name["first.txt"].location,
 			items_by_name["second.txt"].location,
 		)
-		self.assertTrue(all(item.content is None for item in indexed_items))
+		self.assertTrue(all(not hasattr(item, "content") for item in indexed_items))
 		self.assertEqual(
 			len(list(self.db.scalars(select(KnowledgeItem)).all())), 3
 		)
@@ -119,7 +143,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		self.assertEqual(len(updated_items), 1)
 		self.assertEqual(updated_items[0].id, first_item.id)
 		self.assertNotEqual(updated_items[0].content_hash, first_hash)
-		self.assertIsNone(updated_items[0].content)
+		self.assertFalse(hasattr(updated_items[0], "content"))
 		self.assertEqual(updated_items[0].processing_status, "processed")
 		self.assertEqual(
 			len(list(self.db.scalars(select(KnowledgeItem)).all())), 1
@@ -159,7 +183,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 		self.assertNotIn("top-secret", combined_text)
 		self.assertNotIn("abc123", combined_text)
 		self.assertEqual(combined_text.count("[REDACTED]"), 2)
-		self.assertIsNone(item.content)
+		self.assertFalse(hasattr(item, "content"))
 		self.assertEqual(item.processing_status, "processed")
 
 	def test_failed_extraction_sets_error_and_retries_unchanged_file(self):
@@ -174,12 +198,12 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 					self.db, temporary_directory
 				)[0]
 			self.assertEqual(failed_item.processing_status, "failed")
-			self.assertIn("temporary extractor failure", failed_item.processing_error)
+			self.assertEqual(failed_item.processing_error, "processing_failed")
 			processed_item = index_local_directory(self.db, temporary_directory)[0]
 
 		self.assertEqual(processed_item.processing_status, "processed")
 		self.assertIsNone(processed_item.processing_error)
-		self.assertIsNone(processed_item.content)
+		self.assertFalse(hasattr(processed_item, "content"))
 
 	def test_hash_failure_creates_failed_item_and_retries(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
@@ -191,11 +215,54 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			):
 				failed_item = index_local_directory(self.db, temporary_directory)[0]
 			self.assertEqual(failed_item.processing_status, "failed")
-			self.assertIn("temporary read failure", failed_item.processing_error)
+			self.assertEqual(failed_item.processing_error, "content_hash_failed")
 			processed_item = index_local_directory(self.db, temporary_directory)[0]
 
 		self.assertEqual(processed_item.processing_status, "processed")
-		self.assertIsNone(processed_item.content)
+		self.assertFalse(hasattr(processed_item, "content"))
+
+	def test_failed_refresh_preserves_the_last_successful_embedding_and_metadata(self):
+		with tempfile.TemporaryDirectory() as temporary_directory:
+			file_path = Path(temporary_directory) / "notes.txt"
+			file_path.write_text("first approved index", encoding="utf-8")
+			original_item = index_local_directory(self.db, temporary_directory)[0]
+			original_hash = original_item.content_hash
+			original_embedding = list(
+				self.db.get(KnowledgeItemEmbedding, original_item.id).embedding
+			)
+
+			file_path.write_text("changed content that cannot be processed", encoding="utf-8")
+			with patch(
+				"app.ingestion.pipeline.extract_document_text",
+				side_effect=RuntimeError("private source text must not appear in errors"),
+			):
+				failed_item = index_local_directory(self.db, temporary_directory)[0]
+
+			self.assertEqual(failed_item.id, original_item.id)
+			self.assertEqual(failed_item.content_hash, original_hash)
+			self.assertEqual(failed_item.processing_status, "failed")
+			self.assertEqual(failed_item.processing_error, "processing_failed")
+			self.assertEqual(
+				list(self.db.get(KnowledgeItemEmbedding, original_item.id).embedding),
+				original_embedding,
+			)
+
+	def test_embedding_failure_preserves_the_last_known_good_index(self):
+		with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary_directory:
+			file_path = Path(temporary_directory) / "notes.txt"
+			file_path.write_text("first version", encoding="utf-8")
+			original_item = index_local_directory(self.db, temporary_directory)[0]
+			original_hash = original_item.content_hash
+			original_embedding = list(self.db.get(KnowledgeItemEmbedding, original_item.id).embedding)
+			file_path.write_text("second version", encoding="utf-8")
+
+			failed_item = index_local_directory(
+				self.db, temporary_directory, embedding_service=FailingEmbeddingService()
+			)[0]
+
+		self.assertEqual(failed_item.content_hash, original_hash)
+		self.assertEqual(failed_item.processing_error, "processing_failed")
+		self.assertEqual(list(self.db.get(KnowledgeItemEmbedding, original_item.id).embedding), original_embedding)
 
 	def test_skips_file_with_credentials_in_its_path(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:

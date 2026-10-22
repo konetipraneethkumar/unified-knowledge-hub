@@ -6,8 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class KnowledgeItemCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    source: str = Field(min_length=1)
+    source: str = Field(pattern="^local$")
     source_item_id: str = Field(min_length=1)
+    connector_id: str = Field(min_length=1)
+    device_id: str = Field(min_length=1)
     title: str | None = None
     item_type: str | None = None
     mime_type: str | None = None
@@ -25,6 +27,8 @@ class KnowledgeItemRead(BaseModel):
     id: int
     source: str
     source_item_id: str
+    connector_id: str | None
+    device_id: str | None
     title: str | None
     item_type: str | None
     mime_type: str | None

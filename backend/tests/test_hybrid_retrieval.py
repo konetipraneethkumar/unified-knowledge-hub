@@ -9,7 +9,7 @@ from app.ingestion.catalog import create_knowledge_item
 from app.retrieval.hybrid import hybrid_search
 from app.ingestion.indexing import store_embedding
 
-from _postgres_test_db import create_postgres_test_engine
+from tests._postgres_test_db import create_postgres_test_engine
 
 
 class HybridRetrievalTests(unittest.TestCase):

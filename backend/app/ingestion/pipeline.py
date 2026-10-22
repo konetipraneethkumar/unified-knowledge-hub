@@ -9,7 +9,6 @@ from app.ingestion.privacy import filter_file_content
 
 @dataclass(frozen=True)
 class ProcessedContent:
-	content: str
 	embedding: list[float] | None
 
 
@@ -23,12 +22,11 @@ def process_file_content(
 	content = filter_file_content(extract_document_text(path))
 	chunks = chunk_text(content, chunk_size, chunk_overlap)
 	if not chunks:
-		return ProcessedContent(content=content, embedding=None)
+		return ProcessedContent(embedding=None)
 
 	embeddings = embedding_service.embed(chunks)
 	if len(embeddings) != len(chunks):
 		raise ValueError("embedding service returned an unexpected vector count")
 	return ProcessedContent(
-		content=content,
 		embedding=mean_embedding(embeddings),
 	)

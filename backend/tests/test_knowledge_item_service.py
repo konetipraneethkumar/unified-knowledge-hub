@@ -8,7 +8,7 @@ from app.ingestion.catalog import (
 	get_knowledge_item,
 	list_knowledge_items,
 )
-from _postgres_test_db import create_postgres_test_engine
+from tests._postgres_test_db import create_postgres_test_engine
 
 
 class KnowledgeItemServiceTests(unittest.TestCase):

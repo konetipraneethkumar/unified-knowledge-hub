@@ -34,12 +34,6 @@ const initialConnectors: Connector[] = [
     status: "Not connected",
   },
   {
-    id: "whatsapp",
-    name: "WhatsApp",
-    description: "Shared conversations and files",
-    status: "Not connected",
-  },
-  {
     id: "local",
     name: "Local Storage",
     description: "Files selected from this device",

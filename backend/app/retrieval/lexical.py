@@ -19,7 +19,6 @@ def search_knowledge_items(
 	search_filter = or_(
 		KnowledgeItem.title.ilike(pattern, escape="\\"),
 		KnowledgeItem.summary.ilike(pattern, escape="\\"),
-		KnowledgeItem.content.ilike(pattern, escape="\\"),
 		KnowledgeItem.source.ilike(pattern, escape="\\"),
 		KnowledgeItem.item_type.ilike(pattern, escape="\\"),
 	)
@@ -41,24 +40,21 @@ def search_knowledge_items(
 				(KnowledgeItem.summary.ilike(escaped_query, escape="\\"), 3),
 				(KnowledgeItem.summary.ilike(prefix_pattern, escape="\\"), 4),
 				(KnowledgeItem.summary.ilike(pattern, escape="\\"), 5),
-				(KnowledgeItem.content.ilike(escaped_query, escape="\\"), 6),
-				(KnowledgeItem.content.ilike(prefix_pattern, escape="\\"), 7),
-				(KnowledgeItem.content.ilike(pattern, escape="\\"), 8),
 				(
 					or_(
 						KnowledgeItem.source.ilike(escaped_query, escape="\\"),
 						KnowledgeItem.item_type.ilike(escaped_query, escape="\\"),
 					),
-					9,
+					6,
 				),
 				(
 					or_(
 						KnowledgeItem.source.ilike(prefix_pattern, escape="\\"),
 						KnowledgeItem.item_type.ilike(prefix_pattern, escape="\\"),
 					),
-					10,
+					7,
 				),
-				else_=11,
+				else_=8,
 			),
 			KnowledgeItem.id,
 		)

@@ -7,10 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.connectors.local_filesystem import scan_directory, sha256_file
 from app.enrichment.embeddings import EmbeddingService, get_embedding_service
-from app.ingestion.indexing import store_embedding
 from app.ingestion.normalization import normalize_file_metadata
 from app.ingestion.pipeline import process_file_content
 from app.ingestion.extraction import SUPPORTED_EXTENSIONS
+from app.ingestion.local_context import (
+	LocalIndexContext,
+	require_authorized_path,
+	resolve_local_index_context,
+)
 from app.ingestion.privacy import filter_file_metadata
 from app.models import KnowledgeItem, KnowledgeItemEmbedding
 
@@ -18,20 +22,27 @@ from app.models import KnowledgeItem, KnowledgeItemEmbedding
 def index_local_directory(
 	db: Session,
 	directory: str | Path,
+	*,
+	owner_id: int,
+	connector_id: str,
+	device_id: str,
 	embedding_service: EmbeddingService | None = None,
 	chunk_size: int = 1200,
 	chunk_overlap: int = 150,
 ) -> list[KnowledgeItem]:
-	"""Extract, privacy-filter, embed, and reconcile local files beneath a directory."""
+	"""Index only files authorized for one owner, connector, and device."""
 	if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
 		raise ValueError("chunk_overlap must be nonnegative and smaller than chunk_size")
 	embedding_service = embedding_service or get_embedding_service()
-	root = Path(directory).resolve()
+	context = resolve_local_index_context(
+		db, owner_id=owner_id, connector_id=connector_id, device_id=device_id
+	)
+	root = require_authorized_path(directory, context)
 	indexed_items = []
 	eligible_paths = set()
 
-	for record in scan_directory(directory):
-		location = str(Path(record.path).resolve())
+	for record in scan_directory(root):
+		location = str(require_authorized_path(record.path, context))
 		if record.extension.lower() not in SUPPORTED_EXTENSIONS:
 			continue
 		metadata = filter_file_metadata(normalize_file_metadata(record, location))
@@ -41,10 +52,13 @@ def index_local_directory(
 
 		try:
 			content_hash = sha256_file(location)
-		except OSError as error:
-			item = _get_local_item(db, location)
+		except OSError:
+			item = _get_local_item(db, location, context)
 			if item is None:
 				item = KnowledgeItem(
+					owner_id=context.owner_id,
+					connector_id=context.connector_id,
+					device_id=context.device_id,
 					source="local",
 					source_item_id=location,
 					title=metadata["filename"],
@@ -59,14 +73,14 @@ def index_local_directory(
 				)
 				db.add(item)
 			item.processing_status = "failed"
-			item.processing_error = f"{type(error).__name__}: {error}"[:2000]
+			item.processing_error = "content_hash_failed"
 			db.commit()
 			db.refresh(item)
 			indexed_items.append(item)
 			continue
 
 		metadata["content_hash"] = content_hash
-		item = _get_local_item(db, location)
+		item = _get_local_item(db, location, context)
 		if (
 			item is not None
 			and item.content_hash == content_hash
@@ -85,61 +99,77 @@ def index_local_directory(
 			"modified_at": metadata["modified_time"],
 			"content_hash": metadata["content_hash"],
 		}
-		if item is not None:
-			db.execute(
-				delete(KnowledgeItemEmbedding).where(
-					KnowledgeItemEmbedding.item_id == item.id
-				)
-			)
-			for field, value in item_metadata.items():
-				setattr(item, field, value)
-			item.indexed_at = datetime.now(timezone.utc)
-			item.content = None
-			item.processing_status = "processing"
-			item.processing_error = None
-			db.commit()
-		else:
-			item = KnowledgeItem(
-				source="local",
-				source_item_id=metadata["path"],
-				processing_status="processing",
-				**item_metadata,
-			)
-			db.add(item)
-			try:
-				db.commit()
-			except IntegrityError:
-				db.rollback()
-				if _get_local_item(db, location) is None:
-					raise
-				continue
-
 		try:
-			text = filter_file_content(extract_document_text(location))
-			chunks = _chunk_text(text, chunk_size, chunk_overlap)
-			if chunks:
-				vectors = embedding_service.embed(chunks)
-				if len(vectors) != len(chunks):
-					raise ValueError(
-						"embedding service returned an unexpected vector count"
-					)
-				embedding = _mean_vector(vectors)
-				store_embedding(db, item.id, embedding)
-			item.content = text
+			processed = process_file_content(
+				location,
+				embedding_service,
+				chunk_size=chunk_size,
+				chunk_overlap=chunk_overlap,
+			)
+			if item is None:
+				item = KnowledgeItem(
+					owner_id=context.owner_id,
+					connector_id=context.connector_id,
+					device_id=context.device_id,
+					source="local", source_item_id=metadata["path"], **item_metadata
+				)
+				db.add(item)
+				db.flush()
+			else:
+				for field, value in item_metadata.items():
+					setattr(item, field, value)
+			item.indexed_at = datetime.now(timezone.utc)
 			item.processing_status = "processed"
 			item.processing_error = None
+			if processed.embedding is not None:
+				stored_embedding = db.get(KnowledgeItemEmbedding, item.id)
+				if stored_embedding is None:
+					db.add(
+						KnowledgeItemEmbedding(
+							item_id=item.id, embedding=processed.embedding
+						)
+					)
+				else:
+					stored_embedding.embedding = processed.embedding
+			else:
+				db.execute(
+					delete(KnowledgeItemEmbedding).where(
+						KnowledgeItemEmbedding.item_id == item.id
+					)
+				)
 			db.commit()
-		except Exception as error:
+		except IntegrityError:
 			db.rollback()
-			item = db.get(KnowledgeItem, item.id)
+			# A concurrent refresh won the race; leave its index untouched.
+			continue
+		except Exception:
+			db.rollback()
+			item = _get_local_item(db, location, context)
 			if item is None:
-				continue
-			_set_processing_error(db, item, error)
+				item = KnowledgeItem(
+					owner_id=context.owner_id,
+					connector_id=context.connector_id,
+					device_id=context.device_id,
+					source="local",
+					source_item_id=metadata["path"],
+					processing_status="failed",
+					processing_error="processing_failed",
+					**item_metadata,
+				)
+				db.add(item)
+			else:
+				_set_processing_error(db, item)
+			db.commit()
 		db.refresh(item)
 		indexed_items.append(item)
 
 	for item in db.scalars(
-		select(KnowledgeItem).where(KnowledgeItem.source == "local")
+		select(KnowledgeItem).where(
+			KnowledgeItem.source == "local",
+			KnowledgeItem.owner_id == context.owner_id,
+			KnowledgeItem.connector_id == context.connector_id,
+			KnowledgeItem.device_id == context.device_id,
+		)
 	).all():
 		if (
 			_is_beneath(Path(item.source_item_id), root)
@@ -155,21 +185,23 @@ def index_local_directory(
 	return indexed_items
 
 
-def _get_local_item(db: Session, location: str) -> KnowledgeItem | None:
+def _get_local_item(
+	db: Session, location: str, context: LocalIndexContext
+) -> KnowledgeItem | None:
 	return db.scalar(
 		select(KnowledgeItem).where(
 			KnowledgeItem.source == "local",
 			KnowledgeItem.source_item_id == location,
+			KnowledgeItem.owner_id == context.owner_id,
+			KnowledgeItem.connector_id == context.connector_id,
+			KnowledgeItem.device_id == context.device_id,
 		)
 	)
 
 
-def _set_processing_error(
-	db: Session, item: KnowledgeItem, error: Exception
-) -> None:
+def _set_processing_error(db: Session, item: KnowledgeItem) -> None:
 	item.processing_status = "failed"
-	item.processing_error = f"{type(error).__name__}: {error}"[:2000]
-	db.commit()
+	item.processing_error = "processing_failed"
 
 
 def _is_beneath(path: Path, root: Path) -> bool:

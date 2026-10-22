@@ -25,14 +25,17 @@ def create_knowledge_item_route(
 	current_user: User = Depends(get_current_user),
 	db: Session = Depends(get_db),
 ) -> KnowledgeItemRead:
-	return create_knowledge_item(db, knowledge_item, owner_id=current_user.id)
+	try:
+		return create_knowledge_item(db, knowledge_item, owner_id=current_user.id)
+	except ValueError:
+		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Local indexing context not found")
 
 
 @router.get("/{item_id}", response_model=KnowledgeItemRead)
 def get_knowledge_item_route(
 	item_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> KnowledgeItemRead:
-	item = get_knowledge_item(db, item_id, current_user.id)
+	item = get_knowledge_item(db, item_id, owner_id=current_user.id)
 	if item is None:
 		raise HTTPException(
 			status_code=status.HTTP_404_NOT_FOUND,
@@ -48,4 +51,6 @@ def list_knowledge_items_route(
 	offset: int = Query(default=0, ge=0),
 	limit: int = Query(default=100, ge=1, le=500),
 ) -> list[KnowledgeItemRead]:
-	return list_knowledge_items(db, offset=offset, limit=limit, owner_id=current_user.id)
+	return list_knowledge_items(
+		db, owner_id=current_user.id, offset=offset, limit=limit
+	)

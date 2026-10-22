@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.main import app
-from app.models import KnowledgeItem, User
-from _postgres_test_db import create_postgres_test_engine
+from app.models import User
+from tests._postgres_test_db import create_postgres_test_engine
 
 
 class KnowledgeItemSearchApiTests(unittest.TestCase):
@@ -100,32 +100,16 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 					expected_source_item_id,
 				)
 
-	def test_search_matches_extracted_document_content(self):
-		db = self.session_factory()
-		try:
-			db.add(
-				KnowledgeItem(
-					owner_id=1,
-					source="local",
-					source_item_id="document-content",
-					title="Notes",
-					item_type="file",
-					content="A distinctive searchable paragraph",
-					processing_status="processed",
-					owner_id=self.user_id,
-				)
-			)
-			db.commit()
-		finally:
-			db.close()
+	def test_search_does_not_offer_raw_content_search(self):
+		response = self.create_item(
+			"document-content", title="Notes", summary="A concise approved summary"
+		)
+		self.assertEqual(response.status_code, 201, response.text)
 
 		response = self.client.get("/search", params={"q": "distinctive searchable"})
 
 		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.json()["total"], 1)
-		self.assertEqual(
-			response.json()["items"][0]["source_item_id"], "document-content"
-		)
+		self.assertEqual(response.json()["total"], 0)
 
 	def test_search_returns_title_matches_first_and_paginates(self):
 		self.create_item("summary-first", title="Notes", summary="Project report")

@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.main import app
 from app.models import User
-from _postgres_test_db import create_postgres_test_engine
+from tests._postgres_test_db import create_postgres_test_engine
 
 
 class KnowledgeItemApiTests(unittest.TestCase):

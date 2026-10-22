@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -66,6 +66,10 @@ class KnowledgeItem(Base):
 	__tablename__ = "knowledge_items"
 	__table_args__ = (
 		UniqueConstraint("connector_id", "source_item_id", name="uq_knowledge_items_connector_item"),
+		CheckConstraint(
+			"source <> 'local' OR (owner_id IS NOT NULL AND connector_id IS NOT NULL AND device_id IS NOT NULL)",
+			name="ck_local_knowledge_items_have_scope",
+		),
 	)
 
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -84,7 +88,6 @@ class KnowledgeItem(Base):
 	)
 	location: Mapped[str | None] = mapped_column(Text)
 	summary: Mapped[str | None] = mapped_column(Text)
-	content: Mapped[str | None] = mapped_column(Text)
 	processing_status: Mapped[str] = mapped_column(
 		String, default="pending", server_default="pending", nullable=False
 	)

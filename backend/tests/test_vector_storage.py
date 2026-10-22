@@ -9,7 +9,7 @@ from app.ingestion.catalog import create_knowledge_item
 from app.ingestion.indexing import store_embedding
 from app.retrieval.semantic import search_similar_knowledge_items
 
-from _postgres_test_db import create_postgres_test_engine
+from tests._postgres_test_db import create_postgres_test_engine
 
 
 class VectorStorageTests(unittest.TestCase):

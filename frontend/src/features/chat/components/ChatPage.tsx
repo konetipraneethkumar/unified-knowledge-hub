@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "../../../components/ui/Button";
 import { suggestedQueries } from "../data/mockKnowledge";
-import { resolveMockSearch } from "../services/mockSearchService";
+import { searchKnowledge } from "../services/searchApi";
 import { ChatWindow } from "./ChatWindow";
 import type { ChatMessage } from "../types";
 
@@ -40,7 +40,7 @@ export function ChatPage() {
       setIsLoading(true);
 
       try {
-        const result = await resolveMockSearch(trimmedQuery);
+		const result = await searchKnowledge(trimmedQuery);
 
         setMessages((currentMessages) => [
           ...currentMessages,
@@ -52,9 +52,7 @@ export function ChatPage() {
               hour: "numeric",
               minute: "2-digit",
             }),
-            sources: result.status === "success" ? result.documents : undefined,
-            isError: result.status === "error",
-            retryQuery: result.status === "error" ? trimmedQuery : undefined,
+			sources: result.sources,
           },
         ]);
       } catch (error) {
