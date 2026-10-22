@@ -1,24 +1,23 @@
 import unittest
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
+from app.core.database import get_db
+from app.core.security import get_current_user
 from app.main import app
-from app.models import KnowledgeItem
+from app.models import KnowledgeItem, User
+from _postgres_test_db import create_postgres_test_engine
 
 
 class KnowledgeItemSearchApiTests(unittest.TestCase):
 	def setUp(self):
-		self.engine = create_engine(
-			"sqlite://",
-			connect_args={"check_same_thread": False},
-			poolclass=StaticPool,
-		)
-		Base.metadata.create_all(self.engine)
+		self.engine, self.cleanup_database = create_postgres_test_engine()
 		self.session_factory = sessionmaker(bind=self.engine)
+		db = self.session_factory()
+		db.add(User(id=1, email="test@example.invalid", password_hash="test"))
+		db.commit()
+		db.close()
 
 		def override_get_db():
 			db = self.session_factory()
@@ -28,6 +27,9 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 				db.close()
 
 		app.dependency_overrides[get_db] = override_get_db
+		app.dependency_overrides[get_current_user] = lambda: User(
+			id=1, email="test@example.invalid", password_hash="test"
+		)
 		self.client = TestClient(app)
 
 		# Search results are scoped to the authenticated user, so create a real
@@ -48,8 +50,8 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 	def tearDown(self):
 		self.client.close()
 		app.dependency_overrides.pop(get_db, None)
-		Base.metadata.drop_all(self.engine)
-		self.engine.dispose()
+		app.dependency_overrides.pop(get_current_user, None)
+		self.cleanup_database()
 
 	def create_item(
 		self,
@@ -103,6 +105,7 @@ class KnowledgeItemSearchApiTests(unittest.TestCase):
 		try:
 			db.add(
 				KnowledgeItem(
+					owner_id=1,
 					source="local",
 					source_item_id="document-content",
 					title="Notes",

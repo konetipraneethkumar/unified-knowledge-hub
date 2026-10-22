@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from app.core.config import Settings
-from app.services.embeddings import EmbeddingService, MockEmbeddingService
+from app.enrichment.embeddings import EmbeddingService, MockEmbeddingService
 
 
 class EmbeddingServiceTests(unittest.TestCase):
@@ -25,7 +25,7 @@ class EmbeddingServiceTests(unittest.TestCase):
 
     def test_embedding_settings_are_loaded_from_environment(self):
         environment = {
-            "DATABASE_URL": "sqlite://",
+            "DATABASE_URL": "postgresql+psycopg://user:password@localhost/test",
             "EMBEDDING_PROVIDER": "custom-provider",
             "EMBEDDING_MODEL": "test-model",
             "EMBEDDING_API_KEY": "test-secret",

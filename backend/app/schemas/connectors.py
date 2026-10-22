@@ -32,7 +32,7 @@ class DeviceCredentialRead(BaseModel):
 
 class ConnectorCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    connector_type: str = Field(pattern="^(LOCAL|GMAIL|GOOGLE_DRIVE)$")
+    connector_type: str = Field(pattern="^LOCAL$")
     name: str = Field(min_length=1, max_length=120)
     device_id: str | None = None
     authorized_root: str | None = None

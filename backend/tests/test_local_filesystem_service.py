@@ -5,13 +5,12 @@ from datetime import timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base
 from app.models import KnowledgeItem, KnowledgeItemEmbedding
-from app.services.local_filesystem import index_local_directory
+from app.sync.local_filesystem import index_local_directory
+from _postgres_test_db import create_postgres_test_engine
 
 
 class RecordingEmbeddingService:
@@ -25,19 +24,13 @@ class RecordingEmbeddingService:
 
 class LocalFilesystemIndexingTests(unittest.TestCase):
 	def setUp(self):
-		self.engine = create_engine(
-			"sqlite://",
-			connect_args={"check_same_thread": False},
-			poolclass=StaticPool,
-		)
-		Base.metadata.create_all(self.engine)
+		self.engine, self.cleanup_database = create_postgres_test_engine()
 		self.session_factory = sessionmaker(bind=self.engine)
 		self.db = self.session_factory()
 
 	def tearDown(self):
 		self.db.close()
-		Base.metadata.drop_all(self.engine)
-		self.engine.dispose()
+		self.cleanup_database()
 
 	def test_indexes_metadata_and_embedding_without_persisting_text(self):
 		with tempfile.TemporaryDirectory() as temporary_directory:
@@ -174,7 +167,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			file_path = Path(temporary_directory) / "retry.txt"
 			file_path.write_text("retry content", encoding="utf-8")
 			with patch(
-				"app.services.local_filesystem.extract_document_text",
+				"app.ingestion.pipeline.extract_document_text",
 				side_effect=RuntimeError("temporary extractor failure"),
 			):
 				failed_item = index_local_directory(
@@ -193,7 +186,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			file_path = Path(temporary_directory) / "hash-retry.txt"
 			file_path.write_text("hash retry", encoding="utf-8")
 			with patch(
-				"app.services.local_filesystem.sha256_file",
+				"app.sync.local_filesystem.sha256_file",
 				side_effect=OSError("temporary read failure"),
 			):
 				failed_item = index_local_directory(self.db, temporary_directory)[0]
@@ -210,7 +203,7 @@ class LocalFilesystemIndexingTests(unittest.TestCase):
 			file_path.write_text("private", encoding="utf-8")
 
 			with patch(
-				"app.services.local_filesystem.sha256_file",
+				"app.sync.local_filesystem.sha256_file",
 				side_effect=AssertionError("unsafe file contents were hashed"),
 			):
 				indexed_items = index_local_directory(

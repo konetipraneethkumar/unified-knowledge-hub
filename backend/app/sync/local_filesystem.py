@@ -1,6 +1,4 @@
 from datetime import datetime, timezone
-import mimetypes
-from math import sqrt
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -8,14 +6,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.connectors.local_filesystem import scan_directory, sha256_file
+from app.enrichment.embeddings import EmbeddingService, get_embedding_service
+from app.ingestion.indexing import store_embedding
+from app.ingestion.normalization import normalize_file_metadata
+from app.ingestion.pipeline import process_file_content
+from app.ingestion.extraction import SUPPORTED_EXTENSIONS
+from app.ingestion.privacy import filter_file_metadata
 from app.models import KnowledgeItem, KnowledgeItemEmbedding
-from app.services.document_extraction import (
-	SUPPORTED_EXTENSIONS,
-	extract_document_text,
-)
-from app.services.embeddings import EmbeddingService, get_embedding_service
-from app.services.vector_storage import store_embedding
-from app.utils.privacy_filter import filter_file_content, filter_file_metadata
 
 
 def index_local_directory(
@@ -25,7 +22,7 @@ def index_local_directory(
 	chunk_size: int = 1200,
 	chunk_overlap: int = 150,
 ) -> list[KnowledgeItem]:
-	"""Index local-file metadata and embeddings without persisting extracted text."""
+	"""Extract, privacy-filter, embed, and reconcile local files beneath a directory."""
 	if chunk_size < 1 or not 0 <= chunk_overlap < chunk_size:
 		raise ValueError("chunk_overlap must be nonnegative and smaller than chunk_size")
 	embedding_service = embedding_service or get_embedding_service()
@@ -37,17 +34,7 @@ def index_local_directory(
 		location = str(Path(record.path).resolve())
 		if record.extension.lower() not in SUPPORTED_EXTENSIONS:
 			continue
-		metadata = filter_file_metadata(
-			{
-				"path": location,
-				"filename": record.filename,
-				"extension": record.extension,
-				"size": record.size,
-				"created_time": record.created_time,
-				"modified_time": record.modified_time,
-				"mime_type": mimetypes.guess_type(record.filename)[0],
-			}
-		)
+		metadata = filter_file_metadata(normalize_file_metadata(record, location))
 		if metadata is None:
 			continue
 		eligible_paths.add(location)
@@ -138,9 +125,7 @@ def index_local_directory(
 					)
 				embedding = _mean_vector(vectors)
 				store_embedding(db, item.id, embedding)
-			# Extracted text is transient: use it to build embeddings, then discard
-			# it. The knowledge index stores metadata and vectors, not document text.
-			item.content = None
+			item.content = text
 			item.processing_status = "processed"
 			item.processing_error = None
 			db.commit()
@@ -185,30 +170,6 @@ def _set_processing_error(
 	item.processing_status = "failed"
 	item.processing_error = f"{type(error).__name__}: {error}"[:2000]
 	db.commit()
-
-
-def _chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
-	text = text.strip()
-	if not text:
-		return []
-	step = chunk_size - chunk_overlap
-	return [
-		text[start : start + chunk_size]
-		for start in range(0, len(text), step)
-	]
-
-
-def _mean_vector(vectors: list[list[float]]) -> list[float]:
-	if not vectors or any(len(vector) != len(vectors[0]) for vector in vectors):
-		raise ValueError("embedding vectors must have matching dimensions")
-	mean = [
-		sum(vector[index] for vector in vectors) / len(vectors)
-		for index in range(len(vectors[0]))
-	]
-	norm = sqrt(sum(value * value for value in mean))
-	if norm == 0:
-		return vectors[0]
-	return [value / norm for value in mean]
 
 
 def _is_beneath(path: Path, root: Path) -> bool:

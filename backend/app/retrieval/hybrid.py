@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models import KnowledgeItem
-from app.services.embeddings import EmbeddingService
-from app.services.knowledge_items import search_knowledge_items
-from app.services.vector_storage import search_similar_knowledge_items
+from app.enrichment.embeddings import EmbeddingService
+from app.retrieval.lexical import search_knowledge_items
+from app.retrieval.semantic import search_similar_knowledge_items
 
 
 @dataclass(frozen=True)
